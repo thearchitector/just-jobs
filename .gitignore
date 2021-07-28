@@ -1,0 +1,11 @@
+# environment settings
+.vscode
+
+# caches
+.pytest_cache
+.mypy_cache
+__pycache__
+.hypothesis
+
+# builds
+dist

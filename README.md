@@ -1,2 +1,3 @@
 # just-jobs
-A lightweight asynchronous job executor backed by Redis.
+
+A lightweight asynchronous Python job executor backed by Redis.

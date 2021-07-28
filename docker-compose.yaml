@@ -1,0 +1,11 @@
+version: "3"
+services:
+  test:
+    build: .
+    volumes:
+      - ./:/home/developer/just-jobs
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine

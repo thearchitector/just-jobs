@@ -1,48 +1,51 @@
-import asyncio
-import pickle
-from typing import Any
+from typing import Optional
 
-import aioredis
+from aioredis import ConnectionPool, Redis
 
 from .base import Broker
 
 
 class RedisBroker(Broker):
-    async def setup(self, *args: Any, **kwargs: Any):
-        # creates a async redis instance by either a supplied connection pool or by url
-        connection_pool: aioredis.ConnectionPool = kwargs.pop("connection_pool", None)
+    def __init__(
+        self,
+        url: Optional[str] = None,
+        connection_pool: Optional[ConnectionPool] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.url = url
         self.connection_pool = connection_pool
-        if connection_pool:
-            self.redis = aioredis.Redis(connection_pool=connection_pool)
-        else:
-            self.redis = aioredis.Redis.from_url(kwargs.pop("url"), **kwargs)
+        self.shutdown_with_pool = kwargs.pop("shutdown_with_pool", True)
+        self.rkwargs = kwargs
 
-    async def shutdown(self, *args: Any, **kwargs: Any):
+    async def startup(self):
+        # creates a async redis instance by either a supplied connection pool or by url
+        if self.connection_pool:
+            self.redis = Redis(connection_pool=self.connection_pool, **self.rkwargs)
+        else:
+            self.redis = Redis.from_url(self.url, **self.rkwargs)
+            self.connection_pool = self.redis.connection_pool
+
+    async def shutdown(self):
         # shutdowns all redis connections
         await self.redis.close()
-        if self.connection_pool:
+        if self.shutdown_with_pool:
             await self.connection_pool.disconnect()
 
     async def enqueue(self, queue_name: str, job: bytes):
         return await self.redis.rpush(f"jobqueue:{queue_name}", job)
 
-    async def process_job(self, queue_name: str):
+    async def process_jobs(self, queue_name: str):
         jqueue = f"jobqueue:{queue_name}"
         pqueue = f"{jqueue}-processing"
-        loop = asyncio.get_running_loop()
 
         while True:
             # deserialize the queued job for processing
-            serialized = await self.redis.brpoplpush(jqueue, pqueue, timeout=30)
+            serialized = await self.redis.brpoplpush(jqueue, pqueue, timeout=5)
 
             if serialized:
-                partial = pickle.loads(serialized)
-
-                # run the job as a coroutine or in a threadpool
-                if asyncio.iscoroutinefunction(partial.func):
-                    await partial()
-                else:
-                    await loop.run_in_executor(None, partial)
-
-                # remove from the processing queue
-                await self.redis.lrem(pqueue, 0, serialized)
+                # run the job
+                successful = await super().run_job(serialized)
+                if successful:
+                    # remove from the processing queue
+                    await self.redis.lrem(pqueue, 0, serialized)

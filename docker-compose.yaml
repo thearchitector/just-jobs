@@ -5,7 +5,7 @@ services:
     volumes:
       - ./:/home/developer/just-jobs
     depends_on:
-      - redis
+      - redis-storage
 
-  redis:
+  redis-storage:
     image: redis:alpine

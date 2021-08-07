@@ -33,8 +33,7 @@ USER $USERNAME
 WORKDIR $HOME/just-jobs
 
 ## configure poetry settings
-ENV POETRY_VIRTUALENVS_IN_PROJECT=true \
-    POETRY_NO_INTERACTION=1 \
+ENV POETRY_NO_INTERACTION=1 \
     POETRY_NO_ANSI=1 \
     PATH="${HOME}/.poetry/bin:${PATH}"
 
@@ -50,4 +49,5 @@ RUN poetry install --no-dev --no-root --remove-untracked
 COPY . ./
 RUN poetry install
 
+SHELL [ "poetry", "shell" ]
 CMD [ "tail", "-f", "/dev/null" ]

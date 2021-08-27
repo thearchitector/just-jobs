@@ -24,7 +24,7 @@ jobs:
           key: linting-poetry-${{ hashFiles('poetry.lock') }}
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
-        run: poetry install -n --no-root --no-dev -E linting
+        run: poetry install -n --no-root
       - name: Check formatting
         run: poetry run black --check --diff .
       - name: Check typing
@@ -53,7 +53,7 @@ jobs:
             ${{ env.POETRY_CACHE_DIR }}
             .venv
           key: ${{ runner.os }}_${{ matrix.py-version }}_${{ hashFiles('poetry.lock') }}
-      - uses: supercharge/redis-github-action@1.2.0
+      - uses: zhulik/redis-action@1.1.0
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: poetry install -n

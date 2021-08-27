@@ -44,7 +44,7 @@ async def test_not_initialized():
 @pytest.mark.asyncio
 async def test_startup_shutdown(stop_multiprocessing):
     event_mock, process_mock = stop_multiprocessing
-    async with Manager(broker_class=MockBroker) as m:
+    async with Manager(broker=MockBroker) as m:
         assert m.processes
         event_mock.assert_called()
         process_mock.start.assert_called()
@@ -55,14 +55,14 @@ async def test_startup_shutdown(stop_multiprocessing):
 
 @pytest.mark.asyncio
 async def test_bad_queue(stop_multiprocessing):
-    async with Manager(broker_class=MockBroker) as m:
+    async with Manager(broker=MockBroker) as m:
         with pytest.raises(errors.InvalidQueueException):
             await m.enqueue(mock_func, "Hello", queue_name="banana", person="Elias")
 
 
 @pytest.mark.asyncio
 async def test_enqueue(stop_multiprocessing):
-    async with Manager(broker_class=MockBroker) as m:
+    async with Manager(broker=MockBroker) as m:
         queue_name, serialized = await m.enqueue(mock_func, "Hello", person="Elias")
         assert queue_name == "default"
         func = pickle.loads(serialized)

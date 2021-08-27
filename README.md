@@ -8,6 +8,8 @@ A lightweight asynchronous Python job executor. Using Redis by default (but not 
 
 ## Usage
 
+Documentation: <https://thearchitector.github.io/just-jobs/just_jobs/>.
+
 The entire execution structure consists of 3 things:
 
 - The `Manager`, which is responsible for managing the broker and all job queues.

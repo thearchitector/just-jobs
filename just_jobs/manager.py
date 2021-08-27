@@ -1,3 +1,5 @@
+"""The entrypoint for all job queueing and brokering within an application."""
+
 import functools
 import pickle
 from multiprocessing import Event, Process
@@ -8,16 +10,34 @@ from .errors import InvalidEnqueueableFunction, InvalidQueueException, NotReadyE
 
 
 class Manager:
+    """The entrypoint for all job queueing and brokering within an application."""
+
     def __init__(
         self,
-        broker_class: Type[Broker] = RedisBroker,
+        broker: Type[Broker] = RedisBroker,
         queue_names: Optional[List[str]] = None,
-        **kwargs,
+        **bkwargs,
     ):
-        self.broker = broker_class(**kwargs)
-        self.bkwargs = kwargs
-
         self.queue_names = queue_names or ["default"]
+        """
+        The queue names to which jobs will be placed.
+
+        .. tip::
+            It is _**highly**_ recommended to set this list of queue names to logically
+            / functionally separate action-flows in your application. This is because
+            jobs in a single queue are processed sequentially (albeit in
+            asyncio-parallel). Defining separate queues for unrelated actions ensures
+            that a job in one queue does not block the unrelated job from executing.
+        """
+
+        self.broker = broker(**bkwargs)
+        """
+        The broker class to instantiate. `RedisBroker` by default, but may be
+        replaced with a custom `Broker` if desired.
+        """
+        self.bkwargs = bkwargs
+        """Any keyword arguments to pass to the `broker` during initialization."""
+
         self.processes: List[Process] = []
         self._initialized = False
 

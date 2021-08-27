@@ -22,5 +22,5 @@
 </%def>
 
 <style>${homelink()}</style>
-<link rel="canonical" href="https://pdoc3.github.io/pdoc/doc/pdoc">
-<link rel="icon" href="https://pdoc3.github.io/pdoc/logo.png">
+<link rel="canonical" href="https://thearchitector.github.io/just-jobs/just_jobs">
+<link rel="icon" href="https://thearchitector.github.io/just-jobs/logo.png">

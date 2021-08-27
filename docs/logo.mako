@@ -1,5 +1,5 @@
 <header>
-    <a class="homelink" rel="home" title="just-jobs Home" href="https://pdoc3.github.io/pdoc/">
-        <img src="https://pdoc3.github.io/pdoc/logo.png" alt=""> just-jobs
+    <a class="homelink" rel="home" title="just-jobs Home" href="https://thearchitector.github.io/just-jobs/just_jobs">
+        <img src="https://thearchitector.github.io/just-jobs/logo.png" alt=""> just-jobs
     </a>
 </header>

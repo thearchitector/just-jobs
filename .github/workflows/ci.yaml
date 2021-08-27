@@ -9,6 +9,7 @@ jobs:
       fail-fast: false
     env:
       POETRY_CACHE_DIR: ~/.cache/poetry
+      POETRY_VIRTUALENVS_IN_PROJECT: true
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
@@ -42,4 +43,4 @@ jobs:
       - name: Wait for services
         run: sleep 15s
       - name: Run test suite
-        run: docker exec jj-testing pytest -svv
+        run: docker exec jj-testing poetry run pytest -svv

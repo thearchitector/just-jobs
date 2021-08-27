@@ -183,7 +183,7 @@ a database.</p></div>
 via <code><a title="just_jobs.Broker.run_job" href="#just_jobs.Broker.run_job">Broker.run_job()</a></code>. Jobs must be dequeued atomically. This method is also
 responsible for determining what to do if a job fails, like re-adding it to
 the queue.</p>
-<p>~ See <code><a title="just_jobs.RedisBroker.process_jobs" href="brokers/base.html#just_jobs.brokers.base.Broker.process_jobs">RedisBroker.process_jobs()</a></code> for an example.</p></div>
+<p>~ See <a href="https://github.com/thearchitector/just-jobs/blob/main/just_jobs/brokers/redis.py#L58">RedisBroker.process_jobs</a> for an example.</p></div>
 </dd>
 <dt id="just_jobs.Broker.run_job"><code class="name flex">
 <span>async def <span class="ident">run_job</span></span>(<span>self, job: bytes) ‑> bool</span>

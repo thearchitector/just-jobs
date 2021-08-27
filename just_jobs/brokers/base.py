@@ -62,7 +62,7 @@ class Broker(ABC):
         responsible for determining what to do if a job fails, like re-adding it to
         the queue.
 
-        ~ See `RedisBroker.process_jobs` for an example.
+        ~ See [RedisBroker.process_jobs](https://github.com/thearchitector/just-jobs/blob/main/just_jobs/brokers/redis.py#L58) for an example.
         """
         raise NotImplementedError(
             "Storage brokers must define a way to process queued jobs. "

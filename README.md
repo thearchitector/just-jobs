@@ -1,6 +1,10 @@
 # just-jobs
 
-A lightweight asynchronous Python job executor backed by Redis.
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/thearchitector/just-jobs/CI?label=tests&style=flat-square)
+![GitHub](https://img.shields.io/github/license/thearchitector/just-jobs?style=flat-square)
+[![Buy a tree](https://img.shields.io/badge/Treeware-%F0%9F%8C%B3-lightgreen?style=flat-square)](https://ecologi.com/eliasgabriel?r=6128126916bfab8bd051026c)
+
+A lightweight asynchronous Python job executor. Using Redis by default (but not exclusivly, via custom adapters), it is a smaller and production-ready alternative to Celery for applications where distributed microservices are overkill.
 
 ## Usage
 
@@ -51,3 +55,7 @@ async def root():
     await app.state.manager.enqueue(_essential_task, 2, 2)
     return {"message": "The thing is being done!"}
 ```
+
+## Licence
+
+This package is [Treeware](https://treeware.earth). If you use it in production, then we ask that you [**buy the world a tree**](https://ecologi.com/eliasgabriel?r=6128126916bfab8bd051026c) to thank us for our work. By contributing to my forest you’ll be creating employment for local families and restoring wildlife habitats.

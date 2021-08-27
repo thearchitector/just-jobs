@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "just-jobs"
-version = "0.1.0"
+version = "0.2.0"
 description = "A lightweight asynchronous Python job executor backed by Redis."
 authors = ["Elias Gabriel <me@eliasfgabriel.com>"]
 

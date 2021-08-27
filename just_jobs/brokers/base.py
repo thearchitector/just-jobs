@@ -3,16 +3,17 @@ import pickle
 import threading
 from abc import ABC, abstractmethod
 from multiprocessing.synchronize import Event
+from typing import Optional
 
 
 class Broker(ABC):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, coroutines_per_worker: int = 20):
         # settings
-        self.coroutines_per_worker = kwargs.pop("coroutines_per_worker", 20)
+        self.coroutines_per_worker = coroutines_per_worker
 
         # operational
-        self.is_worker = kwargs.pop("is_worker", False)
-        self.loop = kwargs.pop("event_loop", None)
+        self.is_worker: bool = False
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
 
     @abstractmethod
     async def startup(self):
@@ -32,24 +33,38 @@ class Broker(ABC):
 
     @abstractmethod
     async def enqueue(self, queue_name: str, job: bytes):
+        """
+        Enqueues the given serialized job to the provided queue for later processing.
+        """
         raise NotImplementedError(
             "Storage brokers must define a way to enqueue serialized jobs."
         )
 
     @abstractmethod
     async def process_jobs(self, queue_name: str):
+        """
+        Infinitly polls for new jobs pushed the given queue and attempts to run them
+        via `Broker.run_job`. Jobs must be dequeued atomically. This method is also
+        responsible for determining what to do if a job fails, like re-adding it to
+        the queue.
+
+        ~ See `RedisBroker.process_jobs` for an example.
+        """
         raise NotImplementedError(
-            "Storage brokers must define a way to process queued jobs."
+            "Storage brokers must define a way to process queued jobs. "
+            "This should run forever."
         )
 
     @classmethod
-    def _spawn_worker(cls, event: Event, queue_name: str, *bargs, **bkwargs):
+    def _spawn_worker(cls, event: Event, queue_name: str, **bkwargs):
         loop = asyncio.new_event_loop()
         loop_thread = threading.Thread(target=loop.run_forever)
         loop_thread.start()
 
         # create worker and wait for it to startup
-        worker = cls(*bargs, is_worker=True, event_loop=loop, **bkwargs)
+        worker = cls(**bkwargs)
+        worker.is_worker = True
+        worker.loop = loop
         asyncio.run_coroutine_threadsafe(worker.startup(), loop).result()
 
         # spawn N working coroutines
@@ -85,7 +100,7 @@ class Broker(ABC):
             # run the job as a coroutine or in a threadpool
             if asyncio.iscoroutinefunction(partial.func):
                 await partial()
-            else:
+            elif self.loop:
                 await self.loop.run_in_executor(None, partial)
 
             return True

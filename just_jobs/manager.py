@@ -1,10 +1,10 @@
 import functools
 import pickle
-from multiprocessing import Event, Process, synchronize
-from typing import Callable, List, Optional, Tuple, Type
+from multiprocessing import Event, Process
+from typing import Callable, List, Optional, Type
 
 from .brokers import Broker, RedisBroker
-from .errors import InvalidQueueException, NotReadyException
+from .errors import InvalidEnqueueableFunction, InvalidQueueException, NotReadyException
 
 
 class Manager:
@@ -12,51 +12,55 @@ class Manager:
         self,
         broker_class: Type[Broker] = RedisBroker,
         queue_names: Optional[List[str]] = None,
-        *args,
         **kwargs,
     ):
-        self.broker = broker_class(is_worker=False, *args, **kwargs)
-        self.bargs = args
+        self.broker = broker_class(**kwargs)
         self.bkwargs = kwargs
 
         self.queue_names = queue_names or ["default"]
-        self.processes: List[Tuple[synchronize.Event, Process]] = []
+        self.processes: List[Process] = []
         self._initialized = False
 
-    async def __aenter__(self):
-        await self.startup()
-        return self
-
     async def startup(self):
+        """
+        Startup the broker to allow it to perform any initial actions, like connecting
+        to a database. Also spawn/fork the processing queues and register them
+        with the manager, to allow for graceful cleanup during shutdown.
+        """
         # allow the broker to startup whatever it needs
         await self.broker.startup()
 
-        # spawn listening worker processes with communication pipes for cleanup
+        # spawn listening worker processes with communication events for cleanup
+        self._pevent = Event()
         for queue_name in self.queue_names:
-            event = Event()
             p = Process(
                 name=f"brokingworker-{queue_name}",
                 target=self.broker._spawn_worker,
-                args=(event, queue_name, *self.bargs),
+                args=(self._pevent, queue_name),
                 kwargs=self.bkwargs,
             )
-            self.processes.append((event, p))
+            self.processes.append(p)
             p.start()
 
         self._initialized = True
 
-    async def __aexit__(self, exc_type, exc, tb):
-        await self.shutdown()
-
     async def shutdown(self):
+        """
+        Signal all processing workers to shutdown and wait for them to cleanup. Also
+        gracefully shutdown the broker. This must be called after startup.
+        """
+        if not self._initialized:
+            raise NotReadyException()
+
         # shutdown the processes by setting their locking events rather than
         # sending a SIGTERM, to allow the workers to properly cleanup their resources
         # and connections.
-        for event, process in self.processes:
-            event.set()
+        self._pevent.set()
+        for process in self.processes:
             process.join()
 
         await self.broker.shutdown()
+        self._initialized = False
 
     async def enqueue(
         self, func: Callable, *args, queue_name: str = "default", **kwargs
@@ -74,7 +78,7 @@ class Manager:
         elif queue_name not in self.queue_names:
             raise InvalidQueueException()
         elif not callable(func):
-            raise ValueError("You need to enqueue a callable function.")
+            raise InvalidEnqueueableFunction()
 
         # wrap in a partial for serialization
         partial = functools.partial(func, *args, **kwargs)
@@ -83,3 +87,10 @@ class Manager:
         # request the storage broker dispatch the serialized job to the correct
         # worker thread
         return await self.broker.enqueue(queue_name, serialized)
+
+    async def __aenter__(self):
+        await self.startup()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.shutdown()

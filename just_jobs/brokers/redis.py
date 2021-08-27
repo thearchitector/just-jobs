@@ -8,14 +8,15 @@ from .base import Broker
 class RedisBroker(Broker):
     def __init__(
         self,
+        shutdown_with_pool: bool = True,
         url: Optional[str] = None,
         connection_pool: Optional[ConnectionPool] = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(coroutines_per_worker=kwargs.pop("coroutines_per_worker", 20))
         self.url = url
         self.connection_pool = connection_pool
-        self.shutdown_with_pool = kwargs.pop("shutdown_with_pool", True)
+        self.shutdown_with_pool = shutdown_with_pool
         self.rkwargs = kwargs
 
     async def startup(self):

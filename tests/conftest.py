@@ -12,3 +12,15 @@ def event_loop():
 
 def mock_func(message, person="banana"):
     return f"{message}, {person}"
+
+
+async def mock_func_async(message, person="banana"):
+    return f"{message}, {person}"
+
+
+def mock_fail_func(message, person="oh noes"):
+    raise RuntimeError("something isn't right")
+
+
+async def mock_fail_func_async(message, person="oh noes"):
+    raise RuntimeError("something isn't right")

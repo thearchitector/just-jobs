@@ -56,6 +56,8 @@ async def root():
     return {"message": "The thing is being done!"}
 ```
 
-## Licence
+## License
+
+This software is licensed under the [BSD 2-Clause “Simplified” License](LICENSE).
 
 This package is [Treeware](https://treeware.earth). If you use it in production, then we ask that you [**buy the world a tree**](https://ecologi.com/eliasgabriel?r=6128126916bfab8bd051026c) to thank us for our work. By contributing to my forest you’ll be creating employment for local families and restoring wildlife habitats.

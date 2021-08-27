@@ -3,6 +3,9 @@ name = "just-jobs"
 version = "0.2.0"
 description = "A lightweight asynchronous Python job executor backed by Redis."
 authors = ["Elias Gabriel <me@eliasfgabriel.com>"]
+license = "BSD-2-Clause"
+readme = "README.md"
+keywords = ["job queue", "broker", "simple", "celery", "redis"]
 
 [tool.poetry.dependencies]
 python = "^3.6.2"

@@ -10,7 +10,6 @@ class RedisBroker(Broker):
     Production-ready job broker using redis-py for queue management
     and job persistence.
     """
-    redis: Redis
 
     def __init__(
         self,
@@ -19,11 +18,6 @@ class RedisBroker(Broker):
         connection_pool: Optional[ConnectionPool] = None,
         **kwargs,
     ):
-        if not url and not connection_pool:
-            raise ValueError(
-                "You must specify either a valid Redis URL or existing connection pool!"
-            )
-
         super().__init__(coroutines_per_worker=kwargs.pop("coroutines_per_worker", 20))
         self.url = url
         """
@@ -58,8 +52,12 @@ class RedisBroker(Broker):
                 connection_pool=self.connection_pool, **self.kwargs
             )
         elif self.url:
-            self.redis: Redis = Redis.from_url(self.url, **self.kwargs)
+            self.redis: Redis = Redis.from_url(self.url, **self.kwargs)  # type: ignore
             self.connection_pool = self.redis.connection_pool
+        else:
+            raise ValueError(
+                "You must specify either a valid Redis URL or existing connection pool!"
+            )
 
     async def shutdown(self):
         # shutdowns all redis connections

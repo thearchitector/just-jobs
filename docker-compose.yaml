@@ -5,8 +5,5 @@ services:
 
   test:
     build: .
-    container_name: jj-testing
-    volumes:
-      - ./:/home/developer/just-jobs
     depends_on:
       - redis-storage

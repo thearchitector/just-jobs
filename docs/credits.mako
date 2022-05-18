@@ -1,2 +1,0 @@
-<p><a href="https://ecologi.com/eliasgabriel?r=6128126916bfab8bd051026c"><img alt="Buy a tree" src="https://img.shields.io/badge/Treeware-%F0%9F%8C%B3-lightgreen?style=flat-square"></a></p>
-<p><a href="https://www.vecteezy.com">Rake Icon by Vecteezy</a></p>

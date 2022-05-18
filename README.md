@@ -1,6 +1,7 @@
 # just-jobs
 
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/thearchitector/just-jobs/CI?label=tests&style=flat-square)
+![PyPI - Downloads](https://img.shields.io/pypi/dw/just-jobs?style=flat-square)
 ![GitHub](https://img.shields.io/github/license/thearchitector/just-jobs?style=flat-square)
 [![Buy a tree](https://img.shields.io/badge/Treeware-%F0%9F%8C%B3-lightgreen?style=flat-square)](https://ecologi.com/eliasgabriel?r=6128126916bfab8bd051026c)
 
@@ -8,7 +9,7 @@ A lightweight asynchronous Python job executor. Using Redis by default (but not 
 
 ## Usage
 
-Documentation: <https://thearchitector.github.io/just-jobs/just_jobs/>.
+Documentation: <https://justjobs.thearchitector.dev>.
 
 The entire execution structure consists of 3 things:
 
@@ -62,4 +63,4 @@ async def root():
 
 This software is licensed under the [BSD 2-Clause “Simplified” License](LICENSE).
 
-This package is [Treeware](https://treeware.earth). If you use it in production, then we ask that you [**buy the world a tree**](https://ecologi.com/eliasgabriel?r=6128126916bfab8bd051026c) to thank us for our work. By contributing to my forest you’ll be creating employment for local families and restoring wildlife habitats.
+This package is [Treeware](https://treeware.earth). If you use it in production, consider [**buying the world a tree**](https://ecologi.com/eliasgabriel?r=6128126916bfab8bd051026c) to thank me for my work. By contributing to my forest, you’ll be creating employment for local families and restoring wildlife habitats.

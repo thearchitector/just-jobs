@@ -1,15 +1,16 @@
 from typing import Optional
 
-from aioredis import ConnectionPool, Redis
+from redis.asyncio import ConnectionPool, Redis
 
 from .base import Broker
 
 
 class RedisBroker(Broker):
     """
-    Production-ready job broker using [aioredis](https://github.com/aio-libs/aioredis)
-    for queue management and job persistence.
+    Production-ready job broker using redis-py for queue management
+    and job persistence.
     """
+    redis: Redis
 
     def __init__(
         self,
@@ -18,14 +19,26 @@ class RedisBroker(Broker):
         connection_pool: Optional[ConnectionPool] = None,
         **kwargs,
     ):
+        if not url and not connection_pool:
+            raise ValueError(
+                "You must specify either a valid Redis URL or existing connection pool!"
+            )
+
         super().__init__(coroutines_per_worker=kwargs.pop("coroutines_per_worker", 20))
         self.url = url
         """
-        A valid fully-qualified URL to a Redis instance. See [`Redis.from_url`](https://aioredis.readthedocs.io/en/latest/api/high-level/#aioredis.client.Redis.from_url) from [aioredis](https://github.com/aio-libs/aioredis-py) for more information. Mutually exclusive with `connection_pool`.
+        A valid fully-qualified URL to a Redis instance, of one of the following
+        formats. Mutually exclusive with `connection_pool`.
+
+        ```plain
+        redis://[[username]:[password]]@localhost:6379/0
+        rediss://[[username]:[password]]@localhost:6379/0
+        unix://[[username]:[password]]@/path/to/socket.sock?db=0
+        ```
         """
         self.connection_pool = connection_pool
         """
-        A valid connection pool to a Redis instance. See [aioredis.ConnectionPool](https://aioredis.readthedocs.io/en/latest/examples/#connection-pooling) for more information.
+        A valid connection pool to a Redis instance.
         """
         self.shutdown_with_pool = shutdown_with_pool
         """
@@ -34,26 +47,28 @@ class RedisBroker(Broker):
         """
         self.kwargs = kwargs
         """
-        Any keyword arguments to pass through to the aioredis.Redis instance during
+        Any keyword arguments to pass through to the Redis instance during
         creation.
         """
 
     async def startup(self):
         # creates a async redis instance by either a supplied connection pool or by url
         if self.connection_pool:
-            self.redis = Redis(connection_pool=self.connection_pool, **self.kwargs)
-        else:
-            self.redis = Redis.from_url(self.url, **self.kwargs)
+            self.redis: Redis = Redis(
+                connection_pool=self.connection_pool, **self.kwargs
+            )
+        elif self.url:
+            self.redis: Redis = Redis.from_url(self.url, **self.kwargs)
             self.connection_pool = self.redis.connection_pool
 
     async def shutdown(self):
         # shutdowns all redis connections
         await self.redis.close()
-        if self.shutdown_with_pool:
+        if self.connection_pool and self.shutdown_with_pool:
             await self.connection_pool.disconnect()
 
     async def enqueue(self, queue_name: str, job: bytes):
-        return await self.redis.rpush(f"jobqueue:{queue_name}", job)
+        return await self.redis.rpush(f"jobqueue:{queue_name}", job)  # type: ignore
 
     async def process_jobs(self, queue_name: str):
         jqueue = f"jobqueue:{queue_name}"
@@ -68,4 +83,4 @@ class RedisBroker(Broker):
                 successful = await super().run_job(serialized)
                 if successful:
                     # remove from the processing queue
-                    await self.redis.lrem(pqueue, 0, serialized)
+                    await self.redis.lrem(pqueue, 0, serialized)  # type: ignore

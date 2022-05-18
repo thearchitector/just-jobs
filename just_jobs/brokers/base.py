@@ -8,8 +8,9 @@ from typing import Optional
 
 class Broker(ABC):
     """
-    An abtract Broker interface used to define custom functionality. Every Broker
-    class must inherit from this interface and override the defined abstract methods.
+    An abtract Broker interface used to define custom functionality. Every
+    Broker class must inherit from this interface and override the defined
+    abstract methods.
     """
 
     def __init__(self, coroutines_per_worker: int = 20):
@@ -24,8 +25,9 @@ class Broker(ABC):
         # operational
         self.is_worker: bool = False
         """
-        Set by the `Manager` to mark this broker as a worker responsible for processing
-        jobs. May be used during startup and shutdown to do worker-specific actions.
+        Set by the `Manager` to mark this broker as a worker responsible for
+        processing jobs. May be used during startup and shutdown to do
+        worker-specific actions.
         """
         self.loop: Optional[asyncio.AbstractEventLoop] = None
 
@@ -40,15 +42,16 @@ class Broker(ABC):
     @abstractmethod
     async def shutdown(self):
         """
-        Performs any shutdown required by the broker, like ensuring disconnection from
-        a database.
+        Performs any shutdown required by the broker, like ensuring
+        disconnection from a database.
         """
         raise NotImplementedError("Storage brokers must define a shutdown process.")
 
     @abstractmethod
     async def enqueue(self, queue_name: str, job: bytes):
         """
-        Enqueues the given serialized job to the provided queue for later processing.
+        Enqueues the given serialized job to the provided queue for later
+        processing.
         """
         raise NotImplementedError(
             "Storage brokers must define a way to enqueue serialized jobs."
@@ -57,12 +60,12 @@ class Broker(ABC):
     @abstractmethod
     async def process_jobs(self, queue_name: str):
         """
-        Infinitly polls for new jobs pushed the given queue and attempts to run them
-        via `Broker.run_job`. Jobs must be dequeued atomically. This method is also
-        responsible for determining what to do if a job fails, like re-adding it to
-        the queue.
+        Infinitly polls for new jobs pushed the given queue and attempts to run
+        them via `Broker.run_job`. Jobs must be dequeued atomically. This
+        method is also responsible for determining what to do if a job fails,
+        like re-adding it to the queue.
 
-        ~ See [RedisBroker.process_jobs](https://github.com/thearchitector/just-jobs/blob/main/just_jobs/brokers/redis.py#L58) for an example.
+        ~ See `RedisBroker.process_jobs` for an example.
         """
         raise NotImplementedError(
             "Storage brokers must define a way to process queued jobs. "
@@ -72,8 +75,8 @@ class Broker(ABC):
     async def run_job(self, job: bytes) -> bool:
         """
         Loads and executes a job, either directly in the event loop if it's a
-        coroutine or in a threadpool if it isn't. Returns if the job ran successfully
-        or not.
+        coroutine or in a threadpool if it isn't. Returns if the job ran
+        successfully or not.
         """
         partial = pickle.loads(job)
 

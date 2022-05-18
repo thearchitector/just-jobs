@@ -1,38 +1,27 @@
 [tool.poetry]
 name = "just-jobs"
-version = "1.0.0"
+version = "1.1.0"
 description = "A lightweight asynchronous Python job executor backed by Redis."
 authors = ["Elias Gabriel <me@eliasfgabriel.com>"]
 license = "BSD-2-Clause"
 readme = "README.md"
 repository = "https://github.com/thearchitector/just-jobs"
-documentation = "https://thearchitector.github.io/just-jobs/just_jobs"
-keywords = ["job queue", "broker", "simple", "celery", "redis"]
+documentation = "https://justjobs.thearchitector.dev"
+keywords = ["jobs", "broker", "tasks", "celery", "redis"]
+
+include = ["just_jobs/py.typed", "CHANGELOG.md"]
+
 
 [tool.poetry.dependencies]
-python = "^3.6.2"
-aioredis = {extras = ["hiredis"], version = "^2.0.0"}
-anyio = "^3.3.0"
+python = "^3.7"
+hiredis = "^2.0.0"
+redis = "^4.3.1"
 
 [tool.poetry.dev-dependencies]
-black = "^21.7b0"
-isort = "^5.9.2"
-mypy = "^0.910"
-flake8 = "^3.9.2"
 pytest = "^6.2.4"
 pytest-asyncio = "^0.15.1"
-pdoc3 = "^0.10.0"
-
-[tool.isort]
-profile = "black"
-
-[tool.mypy]
-ignore_missing_imports = true
-warn_return_any = true
-show_column_numbers = true
-follow_imports = "silent"
-warn_unreachable = true
+pdoc = "^12.0.0"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry_core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"

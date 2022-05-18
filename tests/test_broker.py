@@ -2,7 +2,7 @@ import functools
 import pickle
 
 import pytest
-from aioredis import Redis
+from redis.asyncio import Redis
 
 from just_jobs import RedisBroker
 

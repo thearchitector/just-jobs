@@ -1,6 +1,3 @@
-"""Possible errors raised by a `Manager` during use."""
-
-
 class NotReadyException(Exception):
     def __init__(self):
         super().__init__("The job manager must initialized before anything can happen.")

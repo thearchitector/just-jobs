@@ -22,12 +22,12 @@ class Manager:
         """
         The queue names to which jobs will be placed.
 
-        .. tip::
-            It is _**highly**_ recommended to set this list of queue names to logically
-            / functionally separate action-flows in your application. This is because
-            jobs in a single queue are processed sequentially (albeit in
-            asyncio-parallel). Defining separate queues for unrelated actions ensures
-            that a job in one queue does not block the unrelated job from executing.
+        It is ***highly*** recommended to set this list of queue names to
+        logically / functionally separate action-flows in your application.
+        This is because jobs in a single queue are processed sequentially
+        (albeit in asyncio-parallel). Defining separate queues for unrelated
+        actions ensures that a job in one queue does not block the unrelated
+        job from executing.
         """
 
         self.broker = broker(**bkwargs)
@@ -36,7 +36,8 @@ class Manager:
         replaced with a custom `Broker` if desired.
         """
         self.bkwargs = bkwargs
-        """Any keyword arguments to pass to the `broker` during initialization."""
+        """
+        Any keyword arguments to pass to the `broker` during initialization."""
 
         self.processes: List[Process] = []
         self._initialized = False

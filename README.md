@@ -5,58 +5,68 @@
 ![GitHub](https://img.shields.io/github/license/thearchitector/just-jobs?style=flat-square)
 [![Buy a tree](https://img.shields.io/badge/Treeware-%F0%9F%8C%B3-lightgreen?style=flat-square)](https://ecologi.com/eliasgabriel?r=6128126916bfab8bd051026c)
 
-A lightweight asynchronous Python job executor. Using Redis by default (but not exclusively, via custom adapters), it is a smaller and production-ready alternative to Celery for applications where distributed microservices are overkill.
-
-## Usage
+A friendly and lightweight wrapper for [arq](https://arq-docs.helpmanual.io). just-jobs provides a simple interface on top of arq that implements additional functionality like synchronous job types (IO-bound vs. CPU-bound) and signed and secure task serialization.
 
 Documentation: <https://justjobs.thearchitector.dev>.
 
-The entire execution structure consists of 3 things:
+```sh
+$ pdm add just-jobs # or
+$ pip install --user just-jobs
+```
 
-- The `Manager`, which is responsible for managing the broker and all job queues.
-- The `Broker`, which is responsible for integrating into a storage interface and executing jobs.
-- A `job`, which is any non-dynamic function or coroutine that performs some task.
+## Features
 
-In general, the process for enqueue jobs for execution is always the same:
+just-jobs doesn't aim to replace the invocations that arq provides, only wrap some of them to make job creation and execution easier and better. It lets you:
 
-1. Create a Manager and tell it to start listening for jobs via `await manager.startup()`.
-2. Anywhere in your application, enqueue a job via `manager.enqueue(job, *args, **kwargs)`.
-3. Ensure to properly shutdown your manager with `await manager.shutdown()`.
+- Define and run non-async jobs. Passing a non-async `@job` function to arq will run properly. Non-async jobs can also be defined as either IO-bound or CPU-bound, which changes how the job will be executed to prevent blocking the asyncio event loop.
+- Specify a single `RedisSettings` within your `WorkerSettings` which you can create a pool from with `Settings.create_broker()`.
+- Run jobs either immediately with the `.now()` function or via normal arq enqueueing.
+- Use non-pickable job arguments and kwargs through the [dill](http://dill.rtfd.io/) library.
+
+Because the aim is simplicity, just-jobs makes some opinionated design decisions. Namely:
+
+- If defining a sync job, you must declare it as either `IO_BOUND` or `CPU_BOUND` so just-jobs knows how to optimally run it. This helps ensure that the arq process event loop is never blocked while encouraging thoughtful and intentional job design.
+- You cannot override the job serialization logic or lifecycle hooks of `BaseSettings`. Jobs are serialized using dill (to support a wider range of arguments) and are always signed for security.
+
+## Usage
+
+Using just-jobs is pretty straight forward:
+
+1. Adding `@job()` to any function will turn it into job that can be delayed by `arq`.
+
+2. If the job is sync, specify it's type like `@job(job_type=JobType.IO_BOUND)`.
+
+3. If you only want to write one function but need to occasionally invoke it immediately, use `yourjob.now(...)`.
+
+4. Create your worker settings by specifying `metaclass=BaseSettings` to your settings class.
 
 ### Example
 
-A common use case for delayed jobs is a web application, where milliseconds are important. Here is an example using FastAPI, whose startup and shutdown hooks make it easier for us to manage the state of our Manager.
-
 ```py
-from fastapi import FastAPI
-from just_jobs import Manager
+from just_jobs import BaseSettings, Context, JobType, job
 
-app = FastAPI()
+@job()
+async def async_task(ctx: Context, url: str):
+    return url
 
-async def _essential_task(a, b):
-    """render a movie, or email a user, or both"""
+@job(job_type=JobType.IO_BOUND)
+def sync_task(ctx: Optional[Context], url: str):
+    # if the context is present, this is being run from the arq listener
+    if ctx:
+        print(url)
+    return url
 
-@app.on_event("startup")
-async def startup():
-    # the default broker is backed by Redis via aioredis. Managers
-    # will always pass any args and kwargs it doesn't recognize to
-    # their brokers during startup.
-    manager = Manager(url="redis://important-redis-server/0")
-    app.state.manager = manager
-    await manager.startup()
+class Settings(metaclass=BaseSettings):
+    functions = [async_task, sync_task]
+    redis_settings = RedisSettings(host="redis")
 
-@app.on_event("shutdown")
-async def shutdown():
-    # this is absolutely essential to allow the manager to shutdown
-    # all the listening workers, as well as for the broker to do any
-    # cleanup or disconnects it should from its backing storage interface.
-    await app.state.manager.shutdown()
+async def main():
+    # create a redis broker using the Settings already defined
+    broker = await Settings.create_broker()
+    # run the_task right now and return the url
+    url = await sync_task.now("https://www.google.com")
 
-@app.get("/do_thing")
-async def root():
-    # enqueue the task so it gets run in a worker's process queue
-    await app.state.manager.enqueue(_essential_task, 2, 2)
-    return {"message": "The thing is being done!"}
+    await broker.enqueue_job("the_task", "https://gianturl.net")
 ```
 
 ## License

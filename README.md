@@ -36,13 +36,15 @@ Using just-jobs is pretty straight forward:
 
 2. If the job is sync, specify it's type like `@job(job_type=JobType.IO_BOUND)`.
 
-3. If you only want to write one function but need to occasionally invoke it immediately, use `yourjob.now(...)`.
+3. If you only want to write one function but need to occasionally invoke it immediately, use `await yourjob.now(...)`.
 
 4. Create your worker settings by specifying `metaclass=BaseSettings` to your settings class.
 
 ### Example
 
-```py
+The complete example (with the `__main__` check) is available at [tests/example.py](tests/example.py) and should work out of the box. The snippet below is just an excerpt of the features described above:
+
+```python
 from just_jobs import BaseSettings, Context, JobType, job
 
 @job()
@@ -64,9 +66,11 @@ async def main():
     # create a redis broker using the Settings already defined
     broker = await Settings.create_broker()
     # run the_task right now and return the url
+    # even though this is a sync function, `.now` returns an awaitable
     url = await sync_task.now("https://www.google.com")
 
-    await broker.enqueue_job("the_task", "https://gianturl.net")
+    await broker.enqueue_job("async_task", "https://gianturl.net")
+    await broker.enqueue_job("sync_task", "https://gianturl.net")
 ```
 
 ## License

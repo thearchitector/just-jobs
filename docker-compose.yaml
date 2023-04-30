@@ -1,9 +1,10 @@
-version: "3"
 services:
-  redis-storage:
+  redis:
     image: redis:alpine
 
   test:
     build: .
+    volumes:
+      - .:/just-jobs
     depends_on:
-      - redis-storage
+      - redis

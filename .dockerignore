@@ -1,4 +1,6 @@
-.vscode
 .venv
-.mypy_cache
-poetry.toml
+build
+dist
+docs
+*cache*
+.github

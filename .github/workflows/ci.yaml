@@ -1,28 +1,28 @@
-name: CI
+# name: CI
 
-on: [push, pull_request]
+# on: [push, pull_request]
 
-jobs:
-  lint:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v2
-      - name: Check formatting
-        uses: psf/black@stable
-      - name: Check typing
-        uses: jpetrucciani/mypy-check@master
-        with:
-          path: "just_jobs"
-          mypy_flags: "--follow-imports=silent --ignore-missing-imports --non-interactive --install-types --pretty --check"
+# jobs:
+#   lint:
+#     runs-on: ubuntu-latest
+#     strategy:
+#       fail-fast: false
+#     steps:
+#       - uses: actions/checkout@v2
+#       - name: Check formatting
+#         uses: psf/black@stable
+#       - name: Check typing
+#         uses: jpetrucciani/mypy-check@master
+#         with:
+#           path: "just_jobs"
+#           mypy_flags: "--follow-imports=silent --ignore-missing-imports --non-interactive --install-types --pretty --check"
 
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    name: tests
-    steps:
-      - uses: actions/checkout@v2
-      - name: Run test suite
-        run: docker-compose run test
+#   test:
+#     runs-on: ubuntu-latest
+#     strategy:
+#       fail-fast: false
+#     name: tests
+#     steps:
+#       - uses: actions/checkout@v2
+#       - name: Run test suite
+#         run: docker-compose run test

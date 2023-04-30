@@ -1,27 +1,37 @@
-[tool.poetry]
+[project]
 name = "just-jobs"
-version = "1.1.0"
-description = "A lightweight asynchronous Python job executor backed by Redis."
-authors = ["Elias Gabriel <me@eliasfgabriel.com>"]
-license = "BSD-2-Clause"
+description = "A friendly and lightweight wrapper for arq."
+version = "2.0.0"
+authors = [
+    {name = "Elias Gabriel", email = "me@eliasfgabriel.com"},
+]
+license = {text = "BSD-2-Clause"}
 readme = "README.md"
+keywords = ["jobs", "arq", "tasks", "celery", "redis"]
+
+requires-python = ">=3.7,<4.0"
+dependencies = [
+    "arq>=0.25.0",
+    "colorama>=0.4.6",
+    "dill>=0.3.6",
+]
+
+[project.urls]
 repository = "https://github.com/thearchitector/just-jobs"
 documentation = "https://justjobs.thearchitector.dev"
-keywords = ["jobs", "broker", "tasks", "celery", "redis"]
 
-include = ["just_jobs/py.typed", "CHANGELOG.md"]
+[tool.pdm.dev-dependencies]
+dev = [
+    "pytest>=7.3.1",
+    "pdoc>=13.1.1",
+]
 
+[tool.pdm.build]
+includes = ["just_jobs/py.typed", "CHANGELOG.md"]
 
-[tool.poetry.dependencies]
-python = "^3.7"
-hiredis = "^2.0.0"
-redis = "^4.3.1"
-
-[tool.poetry.dev-dependencies]
-pytest = "^6.2.4"
-pytest-asyncio = "^0.15.1"
-pdoc = "^12.0.0"
+[tool.pdm.scripts]
+docs = "pdoc -o docs --no-search just_jobs"
 
 [build-system]
-requires = ["poetry_core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

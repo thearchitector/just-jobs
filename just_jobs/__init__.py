@@ -1,20 +1,8 @@
-"""
-Python package `just_jobs` provides a lightweight asynchronous Python job executor.
-Using Redis by default (but not exclusivly, via custom Brokers), it is a smaller and
-production-ready alternative to Celery for applications where distributed microservices
-are overkill.
+""".. include:: ../README.md"""
 
-## What is a "job"?
+from .job_type import JobType
+from .jobs import job
+from .settings import BaseSettings
+from .typing import Context
 
-A job is any exposed function, asynchronous coroutine, or generic callable that has
-been queued to a worker for delayed execution by calling `Manager.enqueue`.
-
-"Exposed" means the callable must be importable through a module-reference
-FQN string, such as "just_jobs.Manager.enqueue". This is due to a limitation with Python
-[pickling](https://docs.python.org/3/library/pickle.html).
-"""
-
-from .brokers import Broker, RedisBroker
-from .manager import Manager
-
-__all__ = ["Manager", "Broker", "RedisBroker"]
+__all__ = ["JobType", "job", "BaseSettings", "Context"]

@@ -20,17 +20,27 @@ dependencies = [
 repository = "https://github.com/thearchitector/just-jobs"
 documentation = "https://justjobs.thearchitector.dev"
 
-[tool.pdm.dev-dependencies]
-dev = [
-    "pytest>=7.3.1",
-    "pdoc>=13.1.1",
-]
-
 [tool.pdm.build]
 includes = ["just_jobs/py.typed", "CHANGELOG.md"]
 
 [tool.pdm.scripts]
 docs = "pdoc -o docs --no-search just_jobs"
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "pytest>=7.3.1",
+    "pytest-asyncio>=0.21.0",
+    "pdoc>=13.1.1",
+]
+
+[tool.pytest.ini_options]
+addopts = "-svv"
+testpaths = [ "tests" ]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.7"
+strict = true
 
 [build-system]
 requires = ["pdm-backend"]

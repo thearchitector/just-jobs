@@ -3,10 +3,9 @@ from hashlib import blake2b
 from secrets import compare_digest
 
 import dill
-from arq import create_pool
-from arq.connections import RedisSettings
 from colorama import Fore, Style
 
+from .broker import Broker
 from .job_type import JobType
 from .typing import Context
 from .utils import styled_text
@@ -44,6 +43,8 @@ class BaseSettings(type):
         for executor in ctx["_executors"].values():
             executor.shutdown(wait=True)
 
+        del ctx["_executors"]
+
         with styled_text(Fore.BLUE, Style.DIM):
             print("[justjobs] Gracefully shutdown executors ✔")
 
@@ -75,23 +76,6 @@ class BaseSettings(type):
 
         return dill.loads(serialized)
 
-    def create_broker(redis_settings: RedisSettings):
-        """
-        Creates a ArqRedis client via `create_pool` using the class's defined
-        `redis_settings` and secure serialization logic.
-        """
-
-        async def wrapper(**kwargs):
-            nonlocal redis_settings
-            return await create_pool(
-                redis_settings,
-                job_serializer=BaseSettings.secure_serializer,
-                job_deserializer=BaseSettings.secure_deserializer,
-                **kwargs,
-            )
-
-        return wrapper
-
     def __new__(cls, clsname, bases, attrs):
         nattrs = dict(
             **attrs,
@@ -99,6 +83,11 @@ class BaseSettings(type):
             on_shutdown=BaseSettings.on_shutdown,
             job_serializer=BaseSettings.secure_serializer,
             job_deserializer=BaseSettings.secure_deserializer,
-            create_broker=BaseSettings.create_broker(attrs["redis_settings"]),
+            create_pool=lambda **kwargs: Broker(
+                redis_settings=attrs["redis_settings"],
+                packj=BaseSettings.secure_serializer,
+                unpackj=BaseSettings.secure_deserializer,
+                kwargs=kwargs,
+            ),
         )
         return super().__new__(cls, clsname, bases, nattrs)

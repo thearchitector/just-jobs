@@ -144,6 +144,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pytest-asyncio"
+version = "0.21.0"
+requires_python = ">=3.7"
+summary = "Pytest support for asyncio"
+dependencies = [
+    "pytest>=7.0.0",
+    "typing-extensions>=3.7.2; python_version < \"3.8\"",
+]
+
+[[package]]
 name = "redis"
 version = "4.5.4"
 requires_python = ">=3.7"
@@ -198,7 +208,7 @@ summary = "Backport of pathlib-compatible object wrapper for zip files"
 [metadata]
 lock_version = "4.2"
 groups = ["default", "dev"]
-content_hash = "sha256:6a1d6970ef1275c466b84d49a717fb6ce5bc1eff6f5645bed74856b66b73029a"
+content_hash = "sha256:c568d1a0d2658367acf04aa7a02fd3d97aaa5e49e46fb7645c339a35d05407eb"
 
 [metadata.files]
 "arq 0.25.0" = [
@@ -403,6 +413,10 @@ content_hash = "sha256:6a1d6970ef1275c466b84d49a717fb6ce5bc1eff6f5645bed74856b66
 "pytest 7.3.1" = [
     {url = "https://files.pythonhosted.org/packages/1b/d1/72df649a705af1e3a09ffe14b0c7d3be1fd730da6b98beb4a2ed26b8a023/pytest-7.3.1-py3-none-any.whl", hash = "sha256:3799fa815351fea3a5e96ac7e503a96fa51cc9942c3753cda7651b93c1cfa362"},
     {url = "https://files.pythonhosted.org/packages/ec/d9/36b65598f3d19d0a14d13dc87ad5fa42869ae53bb7471f619a30eaabc4bf/pytest-7.3.1.tar.gz", hash = "sha256:434afafd78b1d78ed0addf160ad2b77a30d35d4bdf8af234fe621919d9ed15e3"},
+]
+"pytest-asyncio 0.21.0" = [
+    {url = "https://files.pythonhosted.org/packages/66/73/817ddb37c627338ecbb96486c03fe69a19bef72de1b6bd641aa06fed13f4/pytest_asyncio-0.21.0-py3-none-any.whl", hash = "sha256:f2b3366b7cd501a4056858bd39349d5af19742aed2d81660b7998b6341c7eb9c"},
+    {url = "https://files.pythonhosted.org/packages/85/c7/9db0c6215f12f26b590c24acc96d048e03989315f198454540dff95109cd/pytest-asyncio-0.21.0.tar.gz", hash = "sha256:2b38a496aef56f56b0e87557ec313e11e1ab9276fc3863f6a7be0f1d0e415e1b"},
 ]
 "redis 4.5.4" = [
     {url = "https://files.pythonhosted.org/packages/15/00/141ee6abca8d32448b23539e8f0e74091842c30ef357b636b372e2606aa9/redis-4.5.4.tar.gz", hash = "sha256:73ec35da4da267d6847e47f68730fdd5f62e2ca69e3ef5885c6a78a9374c3893"},

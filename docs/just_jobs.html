@@ -25,6 +25,7 @@
   <ul>
     <li><a href="#features">Features</a></li>
     <li><a href="#usage">Usage</a></li>
+    <li><a href="#example">Example</a></li>
     <li><a href="#license">License</a></li>
   </ul></li>
 </ul>
@@ -62,9 +63,6 @@
                         </li>
                         <li>
                                 <a class="function" href="#BaseSettings.secure_deserializer">secure_deserializer</a>
-                        </li>
-                        <li>
-                                <a class="function" href="#BaseSettings.create_broker">create_broker</a>
                         </li>
                 </ul>
 
@@ -111,30 +109,80 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
 
 <ul>
 <li>Define and run non-async jobs. Passing a non-async <code>@job</code> function to arq will run properly. Non-async jobs can also be defined as either IO-bound or CPU-bound, which changes how the job will be executed to prevent blocking the asyncio event loop.</li>
-<li>Specify a single <code>RedisSettings</code> within your <code>WorkerSettings</code> which you can create a pool from with <code>Settings.create_broker()</code>.</li>
+<li>Specify a single <code>RedisSettings</code> within your <code>WorkerSettings</code> from which you can create a pool using <code>Settings.create_pool()</code>.</li>
 <li>Run jobs either immediately with the <code>.now()</code> function or via normal arq enqueueing.</li>
 <li>Use non-pickable job arguments and kwargs through the <a href="http://dill.rtfd.io/">dill</a> library.</li>
 </ul>
 
-<p>Because the aim is simplicity, just-jobs makes some opinionated design decisions. Namely:</p>
-
-<ul>
-<li>If defining a sync job, you must declare it as either <code>IO_BOUND</code> or <code>CPU_BOUND</code> so just-jobs knows how to optimally run it. This helps ensure that the arq process event loop is never blocked while encouraging thoughtful and intentional job design.</li>
-<li>You cannot override the job serialization logic or lifecycle hooks of <code><a href="#BaseSettings">BaseSettings</a></code>. Jobs are serialized using dill (to support a wider range of arguments) and are always signed for security.</li>
-</ul>
-
 <h2 id="usage">Usage</h2>
 
-<p>Using just-jobs is pretty straight forward:</p>
+<p>Using just-jobs is pretty straight forward.</p>
 
-<ol>
-<li><p>Adding <code>@job()</code> to any function will turn it into job that can be delayed by <code>arq</code>.</p></li>
-<li><p>If the job is sync, specify it's type like <code>@job(job_type=JobType.IO_BOUND)</code>.</p></li>
-<li><p>If you only want to write one function but need to occasionally invoke it immediately, use <code>yourjob.now(...)</code>.</p></li>
-<li><p>Create your worker settings by specifying <code>metaclass=BaseSettings</code> to your settings class.</p></li>
-</ol>
+<h3 id="add-job-to-any-function-to-make-it-a-delayable-job">Add <code>@job()</code> to any function to make it a delayable job.</h3>
 
-<h3 id="example">Example</h3>
+<p>If the job is synchronous, specify its job type so just-jobs knows how to optimally run it. If you don't, you'll get an error. This helps encourage thoughtful and intentional job design while ensuring that the event loop is never blocked.</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="nd">@job</span><span class="p">(</span><span class="n">job_type</span><span class="o">=</span><span class="n"><a href="#JobType.CPU_BOUND">JobType.CPU_BOUND</a></span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">complex_math</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">,</span> <span class="n">i</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">j</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>If it's a coroutine function, you don't need to specify a job type (and will get a warning if you do). This might change in the future to support asynchronous CPU-bound tasks.</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="nd">@job</span><span class="p">()</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">poll_reddit</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">,</span> <span class="n">subr</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h3 id="use-now-if-you-want-to-run-the-job-immediately">Use <code>.now</code> if you want to run the job immediately.</h3>
+
+<p>Using <code>.now</code> allows you to run the job as if it were a normal function. If you rely on the <code>ctx</code>, you'll have to include conditional logic to handle its absence.</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="k">await</span> <span class="n">complex_math</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">poll_reddit</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="s2">&quot;r/Python&quot;</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h3 id="define-workersettings-using-the-basesettings-metaclass">Define WorkerSettings using the <code><a href="#BaseSettings">BaseSettings</a></code> metaclass.</h3>
+
+<p>The execution logic that <code>@job</code> provides requires some stuff. When you defining your WorkerSettings, you must declare <code><a href="#BaseSettings">BaseSettings</a></code> as its metaclass to ensure it exists.</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="k">class</span> <span class="nc">Settings</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">BaseSettings</span><span class="p">):</span>
+    <span class="n">redis_settings</span> <span class="o">=</span> <span class="o">...</span>
+</code></pre>
+</div>
+
+<h3 id="use-settingscreate_pool">Use <code>Settings.create_pool()</code>.</h3>
+
+<p>While you may elect to use <code>arq.connections.create_pool</code> as you would normally, using the <code>create_pool</code> function provided by your <code>Settings</code> class ensures the pool it creates always matches your worker's Redis settings. It also lets you take advantage of additional functionality, namely that it can be used as an auto-closing context manager.</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="c1"># manually</span>
+<span class="n">pool</span> <span class="o">=</span> <span class="k">await</span> <span class="n">Settings</span><span class="o">.</span><span class="n">create_pool</span><span class="p">()</span>
+<span class="k">await</span> <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">close_connection_pool</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># or as an async context manager</span>
+<span class="k">async</span> <span class="k">with</span> <span class="n">Settings</span><span class="o">.</span><span class="n">create_pool</span><span class="p">()</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
+    <span class="o">...</span>
+</code></pre>
+</div>
+
+<h3 id="enqueue-your-job">Enqueue your job.</h3>
+
+<p>just-jobs doesn't change the way in which you enqueue your jobs. Just use <code>await pool.enqueue_job(...)</code> as you would normally.</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="k">await</span> <span class="n">pool</span><span class="o">.</span><span class="n">enqueue_job</span><span class="p">(</span><span class="s1">&#39;complex_math&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="example">Example</h2>
+
+<p>The complete example is available at <a href="docs/example.py">docs/example.py</a> and should work out of the box. The snippet below is just an excerpt of the features described above:</p>
 
 <div class="pdoc-code codehilite">
 <pre><span></span><code><span class="kn">from</span> <span class="nn">just_jobs</span> <span class="kn">import</span> <span class="n">BaseSettings</span><span class="p">,</span> <span class="n">Context</span><span class="p">,</span> <span class="n">JobType</span><span class="p">,</span> <span class="n">job</span>
@@ -155,12 +203,16 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
     <span class="n">redis_settings</span> <span class="o">=</span> <span class="n">RedisSettings</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">&quot;redis&quot;</span><span class="p">)</span>
 
 <span class="k">async</span> <span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
-    <span class="c1"># create a redis broker using the Settings already defined</span>
-    <span class="n">broker</span> <span class="o">=</span> <span class="k">await</span> <span class="n">Settings</span><span class="o">.</span><span class="n">create_broker</span><span class="p">()</span>
+    <span class="c1"># create a Redis pool using the Settings already defined</span>
+    <span class="n">pool</span> <span class="o">=</span> <span class="k">await</span> <span class="n">Settings</span><span class="o">.</span><span class="n">create_pool</span><span class="p">()</span>
     <span class="c1"># run the_task right now and return the url</span>
-    <span class="n">url</span> <span class="o">=</span> <span class="k">await</span> <span class="n">sync_task</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="s2">&quot;https://www.google.com&quot;</span><span class="p">)</span>
+    <span class="c1"># even though this is a sync function, `.now` returns an awaitable</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="k">await</span> <span class="n">sync_task</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="s2">&quot;https://www.theglassfiles.com&quot;</span><span class="p">)</span>
 
-    <span class="k">await</span> <span class="n">broker</span><span class="o">.</span><span class="n">enqueue_job</span><span class="p">(</span><span class="s2">&quot;the_task&quot;</span><span class="p">,</span> <span class="s2">&quot;https://gianturl.net&quot;</span><span class="p">)</span>
+    <span class="k">await</span> <span class="n">pool</span><span class="o">.</span><span class="n">enqueue_job</span><span class="p">(</span><span class="s2">&quot;async_task&quot;</span><span class="p">,</span> <span class="s2">&quot;https://www.eliasfgabriel.com&quot;</span><span class="p">)</span>
+    <span class="k">await</span> <span class="n">pool</span><span class="o">.</span><span class="n">enqueue_job</span><span class="p">(</span><span class="s2">&quot;sync_task&quot;</span><span class="p">,</span> <span class="s2">&quot;https://gianturl.net&quot;</span><span class="p">)</span>
+
+    <span class="k">await</span> <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">close_connection_pool</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre>
 </div>
 
@@ -363,92 +415,82 @@ specified for a coroutine, a warning will be thrown (but will still execute).</p
 
     </div>
     <a class="headerlink" href="#BaseSettings"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings-20"><a href="#BaseSettings-20"><span class="linenos"> 20</span></a><span class="k">class</span> <span class="nc">BaseSettings</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
-</span><span id="BaseSettings-21"><a href="#BaseSettings-21"><span class="linenos"> 21</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings-22"><a href="#BaseSettings-22"><span class="linenos"> 22</span></a><span class="sd">    A Metaclass for defining WorkerSettings to pass to an arq process. This enables</span>
-</span><span id="BaseSettings-23"><a href="#BaseSettings-23"><span class="linenos"> 23</span></a><span class="sd">    using the built-in JobType and executor pool logic, as well as secure remote job</span>
-</span><span id="BaseSettings-24"><a href="#BaseSettings-24"><span class="linenos"> 24</span></a><span class="sd">    serialization and parsing.</span>
-</span><span id="BaseSettings-25"><a href="#BaseSettings-25"><span class="linenos"> 25</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="BaseSettings-26"><a href="#BaseSettings-26"><span class="linenos"> 26</span></a>
-</span><span id="BaseSettings-27"><a href="#BaseSettings-27"><span class="linenos"> 27</span></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">on_startup</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">):</span>
-</span><span id="BaseSettings-28"><a href="#BaseSettings-28"><span class="linenos"> 28</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings-29"><a href="#BaseSettings-29"><span class="linenos"> 29</span></a><span class="sd">        Starts the thread and process pool executors for downstream synchronous job</span>
-</span><span id="BaseSettings-30"><a href="#BaseSettings-30"><span class="linenos"> 30</span></a><span class="sd">        execution.</span>
-</span><span id="BaseSettings-31"><a href="#BaseSettings-31"><span class="linenos"> 31</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="BaseSettings-32"><a href="#BaseSettings-32"><span class="linenos"> 32</span></a>        <span class="k">with</span> <span class="n">styled_text</span><span class="p">(</span><span class="n">Fore</span><span class="o">.</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">Style</span><span class="o">.</span><span class="n">DIM</span><span class="p">):</span>
-</span><span id="BaseSettings-33"><a href="#BaseSettings-33"><span class="linenos"> 33</span></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[justjobs] Starting executors...&quot;</span><span class="p">)</span>
-</span><span id="BaseSettings-34"><a href="#BaseSettings-34"><span class="linenos"> 34</span></a>
-</span><span id="BaseSettings-35"><a href="#BaseSettings-35"><span class="linenos"> 35</span></a>        <span class="c1"># we&#39;re ok creating pools for all the types since the executors don&#39;t</span>
-</span><span id="BaseSettings-36"><a href="#BaseSettings-36"><span class="linenos"> 36</span></a>        <span class="c1"># spin up the threads / processes unless a task is scheduled to run in one</span>
-</span><span id="BaseSettings-37"><a href="#BaseSettings-37"><span class="linenos"> 37</span></a>        <span class="n">ctx</span><span class="p">[</span><span class="s2">&quot;_executors&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="BaseSettings-38"><a href="#BaseSettings-38"><span class="linenos"> 38</span></a>            <span class="n">jtype</span><span class="p">:</span> <span class="n">jtype</span><span class="o">.</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">](</span><span class="n">max_workers</span><span class="o">=</span><span class="n">jtype</span><span class="o">.</span><span class="n">value</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">jtype</span> <span class="ow">in</span> <span class="n">JobType</span>
-</span><span id="BaseSettings-39"><a href="#BaseSettings-39"><span class="linenos"> 39</span></a>        <span class="p">}</span>
-</span><span id="BaseSettings-40"><a href="#BaseSettings-40"><span class="linenos"> 40</span></a>
-</span><span id="BaseSettings-41"><a href="#BaseSettings-41"><span class="linenos"> 41</span></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">on_shutdown</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">):</span>
-</span><span id="BaseSettings-42"><a href="#BaseSettings-42"><span class="linenos"> 42</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings-43"><a href="#BaseSettings-43"><span class="linenos"> 43</span></a><span class="sd">        Gracefully shuts down the available thread and process pool executors.</span>
-</span><span id="BaseSettings-44"><a href="#BaseSettings-44"><span class="linenos"> 44</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="BaseSettings-45"><a href="#BaseSettings-45"><span class="linenos"> 45</span></a>        <span class="k">for</span> <span class="n">executor</span> <span class="ow">in</span> <span class="n">ctx</span><span class="p">[</span><span class="s2">&quot;_executors&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-</span><span id="BaseSettings-46"><a href="#BaseSettings-46"><span class="linenos"> 46</span></a>            <span class="n">executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span><span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="BaseSettings-47"><a href="#BaseSettings-47"><span class="linenos"> 47</span></a>
-</span><span id="BaseSettings-48"><a href="#BaseSettings-48"><span class="linenos"> 48</span></a>        <span class="k">with</span> <span class="n">styled_text</span><span class="p">(</span><span class="n">Fore</span><span class="o">.</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">Style</span><span class="o">.</span><span class="n">DIM</span><span class="p">):</span>
-</span><span id="BaseSettings-49"><a href="#BaseSettings-49"><span class="linenos"> 49</span></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[justjobs] Gracefully shutdown executors ✔&quot;</span><span class="p">)</span>
-</span><span id="BaseSettings-50"><a href="#BaseSettings-50"><span class="linenos"> 50</span></a>
-</span><span id="BaseSettings-51"><a href="#BaseSettings-51"><span class="linenos"> 51</span></a>    <span class="k">def</span> <span class="nf">secure_serializer</span><span class="p">(</span><span class="n">job</span><span class="p">):</span>
-</span><span id="BaseSettings-52"><a href="#BaseSettings-52"><span class="linenos"> 52</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings-53"><a href="#BaseSettings-53"><span class="linenos"> 53</span></a><span class="sd">        Efficiently serializes the given job using dill and signs it using</span>
-</span><span id="BaseSettings-54"><a href="#BaseSettings-54"><span class="linenos"> 54</span></a><span class="sd">        blake2b. During execution the signature is extracted and compare to the</span>
-</span><span id="BaseSettings-55"><a href="#BaseSettings-55"><span class="linenos"> 55</span></a><span class="sd">        job function to ensure the intended job is run.</span>
-</span><span id="BaseSettings-56"><a href="#BaseSettings-56"><span class="linenos"> 56</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="BaseSettings-57"><a href="#BaseSettings-57"><span class="linenos"> 57</span></a>        <span class="n">serialized</span> <span class="o">=</span> <span class="n">dill</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
-</span><span id="BaseSettings-58"><a href="#BaseSettings-58"><span class="linenos"> 58</span></a>        <span class="n">signer</span> <span class="o">=</span> <span class="n">blake2b</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">SERIALIZATION_SECRET</span><span class="p">)</span>
-</span><span id="BaseSettings-59"><a href="#BaseSettings-59"><span class="linenos"> 59</span></a>        <span class="n">signer</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
-</span><span id="BaseSettings-60"><a href="#BaseSettings-60"><span class="linenos"> 60</span></a>        <span class="c1"># must be hexdigest to ensure no premature byte delimiters</span>
-</span><span id="BaseSettings-61"><a href="#BaseSettings-61"><span class="linenos"> 61</span></a>        <span class="n">sig</span> <span class="o">=</span> <span class="n">signer</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
-</span><span id="BaseSettings-62"><a href="#BaseSettings-62"><span class="linenos"> 62</span></a>        <span class="k">return</span> <span class="p">(</span><span class="n">sig</span> <span class="o">+</span> <span class="s2">&quot;|&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="n">serialized</span>
-</span><span id="BaseSettings-63"><a href="#BaseSettings-63"><span class="linenos"> 63</span></a>
-</span><span id="BaseSettings-64"><a href="#BaseSettings-64"><span class="linenos"> 64</span></a>    <span class="k">def</span> <span class="nf">secure_deserializer</span><span class="p">(</span><span class="n">packed</span><span class="p">):</span>
-</span><span id="BaseSettings-65"><a href="#BaseSettings-65"><span class="linenos"> 65</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings-66"><a href="#BaseSettings-66"><span class="linenos"> 66</span></a><span class="sd">        Extracts the signature from the serialized job and compares it with the job</span>
-</span><span id="BaseSettings-67"><a href="#BaseSettings-67"><span class="linenos"> 67</span></a><span class="sd">        function. If the signatures match, the job is deserialized and executed. If</span>
-</span><span id="BaseSettings-68"><a href="#BaseSettings-68"><span class="linenos"> 68</span></a><span class="sd">        not, an error is raised.</span>
-</span><span id="BaseSettings-69"><a href="#BaseSettings-69"><span class="linenos"> 69</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="BaseSettings-70"><a href="#BaseSettings-70"><span class="linenos"> 70</span></a>        <span class="n">sig</span><span class="p">,</span> <span class="n">serialized</span> <span class="o">=</span> <span class="n">packed</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;|&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-</span><span id="BaseSettings-71"><a href="#BaseSettings-71"><span class="linenos"> 71</span></a>        <span class="n">signer</span> <span class="o">=</span> <span class="n">blake2b</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">SERIALIZATION_SECRET</span><span class="p">)</span>
-</span><span id="BaseSettings-72"><a href="#BaseSettings-72"><span class="linenos"> 72</span></a>        <span class="n">signer</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
-</span><span id="BaseSettings-73"><a href="#BaseSettings-73"><span class="linenos"> 73</span></a>        <span class="k">assert</span> <span class="n">compare_digest</span><span class="p">(</span>
-</span><span id="BaseSettings-74"><a href="#BaseSettings-74"><span class="linenos"> 74</span></a>            <span class="n">sig</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">),</span> <span class="n">signer</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
-</span><span id="BaseSettings-75"><a href="#BaseSettings-75"><span class="linenos"> 75</span></a>        <span class="p">),</span> <span class="s2">&quot;Invalid job signature! Has someone tampered with your job queue?&quot;</span>
-</span><span id="BaseSettings-76"><a href="#BaseSettings-76"><span class="linenos"> 76</span></a>
-</span><span id="BaseSettings-77"><a href="#BaseSettings-77"><span class="linenos"> 77</span></a>        <span class="k">return</span> <span class="n">dill</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
-</span><span id="BaseSettings-78"><a href="#BaseSettings-78"><span class="linenos"> 78</span></a>
-</span><span id="BaseSettings-79"><a href="#BaseSettings-79"><span class="linenos"> 79</span></a>    <span class="k">def</span> <span class="nf">create_broker</span><span class="p">(</span><span class="n">redis_settings</span><span class="p">:</span> <span class="n">RedisSettings</span><span class="p">):</span>
-</span><span id="BaseSettings-80"><a href="#BaseSettings-80"><span class="linenos"> 80</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings-81"><a href="#BaseSettings-81"><span class="linenos"> 81</span></a><span class="sd">        Creates a ArqRedis client via `create_pool` using the class&#39;s defined</span>
-</span><span id="BaseSettings-82"><a href="#BaseSettings-82"><span class="linenos"> 82</span></a><span class="sd">        `redis_settings` and secure serialization logic.</span>
-</span><span id="BaseSettings-83"><a href="#BaseSettings-83"><span class="linenos"> 83</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="BaseSettings-84"><a href="#BaseSettings-84"><span class="linenos"> 84</span></a>
-</span><span id="BaseSettings-85"><a href="#BaseSettings-85"><span class="linenos"> 85</span></a>        <span class="k">async</span> <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-</span><span id="BaseSettings-86"><a href="#BaseSettings-86"><span class="linenos"> 86</span></a>            <span class="k">nonlocal</span> <span class="n">redis_settings</span>
-</span><span id="BaseSettings-87"><a href="#BaseSettings-87"><span class="linenos"> 87</span></a>            <span class="k">return</span> <span class="k">await</span> <span class="n">create_pool</span><span class="p">(</span>
-</span><span id="BaseSettings-88"><a href="#BaseSettings-88"><span class="linenos"> 88</span></a>                <span class="n">redis_settings</span><span class="p">,</span>
-</span><span id="BaseSettings-89"><a href="#BaseSettings-89"><span class="linenos"> 89</span></a>                <span class="n">job_serializer</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">secure_serializer</span><span class="p">,</span>
-</span><span id="BaseSettings-90"><a href="#BaseSettings-90"><span class="linenos"> 90</span></a>                <span class="n">job_deserializer</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">secure_deserializer</span><span class="p">,</span>
-</span><span id="BaseSettings-91"><a href="#BaseSettings-91"><span class="linenos"> 91</span></a>                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-</span><span id="BaseSettings-92"><a href="#BaseSettings-92"><span class="linenos"> 92</span></a>            <span class="p">)</span>
-</span><span id="BaseSettings-93"><a href="#BaseSettings-93"><span class="linenos"> 93</span></a>
-</span><span id="BaseSettings-94"><a href="#BaseSettings-94"><span class="linenos"> 94</span></a>        <span class="k">return</span> <span class="n">wrapper</span>
-</span><span id="BaseSettings-95"><a href="#BaseSettings-95"><span class="linenos"> 95</span></a>
-</span><span id="BaseSettings-96"><a href="#BaseSettings-96"><span class="linenos"> 96</span></a>    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">clsname</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">attrs</span><span class="p">):</span>
-</span><span id="BaseSettings-97"><a href="#BaseSettings-97"><span class="linenos"> 97</span></a>        <span class="n">nattrs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
-</span><span id="BaseSettings-98"><a href="#BaseSettings-98"><span class="linenos"> 98</span></a>            <span class="o">**</span><span class="n">attrs</span><span class="p">,</span>
-</span><span id="BaseSettings-99"><a href="#BaseSettings-99"><span class="linenos"> 99</span></a>            <span class="n">on_startup</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">on_startup</span><span class="p">,</span>
-</span><span id="BaseSettings-100"><a href="#BaseSettings-100"><span class="linenos">100</span></a>            <span class="n">on_shutdown</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">on_shutdown</span><span class="p">,</span>
-</span><span id="BaseSettings-101"><a href="#BaseSettings-101"><span class="linenos">101</span></a>            <span class="n">job_serializer</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">secure_serializer</span><span class="p">,</span>
-</span><span id="BaseSettings-102"><a href="#BaseSettings-102"><span class="linenos">102</span></a>            <span class="n">job_deserializer</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">secure_deserializer</span><span class="p">,</span>
-</span><span id="BaseSettings-103"><a href="#BaseSettings-103"><span class="linenos">103</span></a>            <span class="n">create_broker</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">create_broker</span><span class="p">(</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;redis_settings&quot;</span><span class="p">]),</span>
-</span><span id="BaseSettings-104"><a href="#BaseSettings-104"><span class="linenos">104</span></a>        <span class="p">)</span>
-</span><span id="BaseSettings-105"><a href="#BaseSettings-105"><span class="linenos">105</span></a>        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">clsname</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">nattrs</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings-19"><a href="#BaseSettings-19"><span class="linenos">19</span></a><span class="k">class</span> <span class="nc">BaseSettings</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
+</span><span id="BaseSettings-20"><a href="#BaseSettings-20"><span class="linenos">20</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="BaseSettings-21"><a href="#BaseSettings-21"><span class="linenos">21</span></a><span class="sd">    A Metaclass for defining WorkerSettings to pass to an arq process. This enables</span>
+</span><span id="BaseSettings-22"><a href="#BaseSettings-22"><span class="linenos">22</span></a><span class="sd">    using the built-in JobType and executor pool logic, as well as secure remote job</span>
+</span><span id="BaseSettings-23"><a href="#BaseSettings-23"><span class="linenos">23</span></a><span class="sd">    serialization and parsing.</span>
+</span><span id="BaseSettings-24"><a href="#BaseSettings-24"><span class="linenos">24</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="BaseSettings-25"><a href="#BaseSettings-25"><span class="linenos">25</span></a>
+</span><span id="BaseSettings-26"><a href="#BaseSettings-26"><span class="linenos">26</span></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">on_startup</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">):</span>
+</span><span id="BaseSettings-27"><a href="#BaseSettings-27"><span class="linenos">27</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="BaseSettings-28"><a href="#BaseSettings-28"><span class="linenos">28</span></a><span class="sd">        Starts the thread and process pool executors for downstream synchronous job</span>
+</span><span id="BaseSettings-29"><a href="#BaseSettings-29"><span class="linenos">29</span></a><span class="sd">        execution.</span>
+</span><span id="BaseSettings-30"><a href="#BaseSettings-30"><span class="linenos">30</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="BaseSettings-31"><a href="#BaseSettings-31"><span class="linenos">31</span></a>        <span class="k">with</span> <span class="n">styled_text</span><span class="p">(</span><span class="n">Fore</span><span class="o">.</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">Style</span><span class="o">.</span><span class="n">DIM</span><span class="p">):</span>
+</span><span id="BaseSettings-32"><a href="#BaseSettings-32"><span class="linenos">32</span></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[justjobs] Starting executors...&quot;</span><span class="p">)</span>
+</span><span id="BaseSettings-33"><a href="#BaseSettings-33"><span class="linenos">33</span></a>
+</span><span id="BaseSettings-34"><a href="#BaseSettings-34"><span class="linenos">34</span></a>        <span class="c1"># we&#39;re ok creating pools for all the types since the executors don&#39;t</span>
+</span><span id="BaseSettings-35"><a href="#BaseSettings-35"><span class="linenos">35</span></a>        <span class="c1"># spin up the threads / processes unless a task is scheduled to run in one</span>
+</span><span id="BaseSettings-36"><a href="#BaseSettings-36"><span class="linenos">36</span></a>        <span class="n">ctx</span><span class="p">[</span><span class="s2">&quot;_executors&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="BaseSettings-37"><a href="#BaseSettings-37"><span class="linenos">37</span></a>            <span class="n">jtype</span><span class="p">:</span> <span class="n">jtype</span><span class="o">.</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">](</span><span class="n">max_workers</span><span class="o">=</span><span class="n">jtype</span><span class="o">.</span><span class="n">value</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">jtype</span> <span class="ow">in</span> <span class="n">JobType</span>
+</span><span id="BaseSettings-38"><a href="#BaseSettings-38"><span class="linenos">38</span></a>        <span class="p">}</span>
+</span><span id="BaseSettings-39"><a href="#BaseSettings-39"><span class="linenos">39</span></a>
+</span><span id="BaseSettings-40"><a href="#BaseSettings-40"><span class="linenos">40</span></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">on_shutdown</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">):</span>
+</span><span id="BaseSettings-41"><a href="#BaseSettings-41"><span class="linenos">41</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="BaseSettings-42"><a href="#BaseSettings-42"><span class="linenos">42</span></a><span class="sd">        Gracefully shuts down the available thread and process pool executors.</span>
+</span><span id="BaseSettings-43"><a href="#BaseSettings-43"><span class="linenos">43</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="BaseSettings-44"><a href="#BaseSettings-44"><span class="linenos">44</span></a>        <span class="k">for</span> <span class="n">executor</span> <span class="ow">in</span> <span class="n">ctx</span><span class="p">[</span><span class="s2">&quot;_executors&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+</span><span id="BaseSettings-45"><a href="#BaseSettings-45"><span class="linenos">45</span></a>            <span class="n">executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span><span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="BaseSettings-46"><a href="#BaseSettings-46"><span class="linenos">46</span></a>
+</span><span id="BaseSettings-47"><a href="#BaseSettings-47"><span class="linenos">47</span></a>        <span class="k">del</span> <span class="n">ctx</span><span class="p">[</span><span class="s2">&quot;_executors&quot;</span><span class="p">]</span>
+</span><span id="BaseSettings-48"><a href="#BaseSettings-48"><span class="linenos">48</span></a>
+</span><span id="BaseSettings-49"><a href="#BaseSettings-49"><span class="linenos">49</span></a>        <span class="k">with</span> <span class="n">styled_text</span><span class="p">(</span><span class="n">Fore</span><span class="o">.</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">Style</span><span class="o">.</span><span class="n">DIM</span><span class="p">):</span>
+</span><span id="BaseSettings-50"><a href="#BaseSettings-50"><span class="linenos">50</span></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[justjobs] Gracefully shutdown executors ✔&quot;</span><span class="p">)</span>
+</span><span id="BaseSettings-51"><a href="#BaseSettings-51"><span class="linenos">51</span></a>
+</span><span id="BaseSettings-52"><a href="#BaseSettings-52"><span class="linenos">52</span></a>    <span class="k">def</span> <span class="nf">secure_serializer</span><span class="p">(</span><span class="n">job</span><span class="p">):</span>
+</span><span id="BaseSettings-53"><a href="#BaseSettings-53"><span class="linenos">53</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="BaseSettings-54"><a href="#BaseSettings-54"><span class="linenos">54</span></a><span class="sd">        Efficiently serializes the given job using dill and signs it using</span>
+</span><span id="BaseSettings-55"><a href="#BaseSettings-55"><span class="linenos">55</span></a><span class="sd">        blake2b. During execution the signature is extracted and compare to the</span>
+</span><span id="BaseSettings-56"><a href="#BaseSettings-56"><span class="linenos">56</span></a><span class="sd">        job function to ensure the intended job is run.</span>
+</span><span id="BaseSettings-57"><a href="#BaseSettings-57"><span class="linenos">57</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="BaseSettings-58"><a href="#BaseSettings-58"><span class="linenos">58</span></a>        <span class="n">serialized</span> <span class="o">=</span> <span class="n">dill</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+</span><span id="BaseSettings-59"><a href="#BaseSettings-59"><span class="linenos">59</span></a>        <span class="n">signer</span> <span class="o">=</span> <span class="n">blake2b</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">SERIALIZATION_SECRET</span><span class="p">)</span>
+</span><span id="BaseSettings-60"><a href="#BaseSettings-60"><span class="linenos">60</span></a>        <span class="n">signer</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
+</span><span id="BaseSettings-61"><a href="#BaseSettings-61"><span class="linenos">61</span></a>        <span class="c1"># must be hexdigest to ensure no premature byte delimiters</span>
+</span><span id="BaseSettings-62"><a href="#BaseSettings-62"><span class="linenos">62</span></a>        <span class="n">sig</span> <span class="o">=</span> <span class="n">signer</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+</span><span id="BaseSettings-63"><a href="#BaseSettings-63"><span class="linenos">63</span></a>        <span class="k">return</span> <span class="p">(</span><span class="n">sig</span> <span class="o">+</span> <span class="s2">&quot;|&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="n">serialized</span>
+</span><span id="BaseSettings-64"><a href="#BaseSettings-64"><span class="linenos">64</span></a>
+</span><span id="BaseSettings-65"><a href="#BaseSettings-65"><span class="linenos">65</span></a>    <span class="k">def</span> <span class="nf">secure_deserializer</span><span class="p">(</span><span class="n">packed</span><span class="p">):</span>
+</span><span id="BaseSettings-66"><a href="#BaseSettings-66"><span class="linenos">66</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="BaseSettings-67"><a href="#BaseSettings-67"><span class="linenos">67</span></a><span class="sd">        Extracts the signature from the serialized job and compares it with the job</span>
+</span><span id="BaseSettings-68"><a href="#BaseSettings-68"><span class="linenos">68</span></a><span class="sd">        function. If the signatures match, the job is deserialized and executed. If</span>
+</span><span id="BaseSettings-69"><a href="#BaseSettings-69"><span class="linenos">69</span></a><span class="sd">        not, an error is raised.</span>
+</span><span id="BaseSettings-70"><a href="#BaseSettings-70"><span class="linenos">70</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="BaseSettings-71"><a href="#BaseSettings-71"><span class="linenos">71</span></a>        <span class="n">sig</span><span class="p">,</span> <span class="n">serialized</span> <span class="o">=</span> <span class="n">packed</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;|&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</span><span id="BaseSettings-72"><a href="#BaseSettings-72"><span class="linenos">72</span></a>        <span class="n">signer</span> <span class="o">=</span> <span class="n">blake2b</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">SERIALIZATION_SECRET</span><span class="p">)</span>
+</span><span id="BaseSettings-73"><a href="#BaseSettings-73"><span class="linenos">73</span></a>        <span class="n">signer</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
+</span><span id="BaseSettings-74"><a href="#BaseSettings-74"><span class="linenos">74</span></a>        <span class="k">assert</span> <span class="n">compare_digest</span><span class="p">(</span>
+</span><span id="BaseSettings-75"><a href="#BaseSettings-75"><span class="linenos">75</span></a>            <span class="n">sig</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">),</span> <span class="n">signer</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+</span><span id="BaseSettings-76"><a href="#BaseSettings-76"><span class="linenos">76</span></a>        <span class="p">),</span> <span class="s2">&quot;Invalid job signature! Has someone tampered with your job queue?&quot;</span>
+</span><span id="BaseSettings-77"><a href="#BaseSettings-77"><span class="linenos">77</span></a>
+</span><span id="BaseSettings-78"><a href="#BaseSettings-78"><span class="linenos">78</span></a>        <span class="k">return</span> <span class="n">dill</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
+</span><span id="BaseSettings-79"><a href="#BaseSettings-79"><span class="linenos">79</span></a>
+</span><span id="BaseSettings-80"><a href="#BaseSettings-80"><span class="linenos">80</span></a>    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">clsname</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">attrs</span><span class="p">):</span>
+</span><span id="BaseSettings-81"><a href="#BaseSettings-81"><span class="linenos">81</span></a>        <span class="n">nattrs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+</span><span id="BaseSettings-82"><a href="#BaseSettings-82"><span class="linenos">82</span></a>            <span class="o">**</span><span class="n">attrs</span><span class="p">,</span>
+</span><span id="BaseSettings-83"><a href="#BaseSettings-83"><span class="linenos">83</span></a>            <span class="n">on_startup</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">on_startup</span><span class="p">,</span>
+</span><span id="BaseSettings-84"><a href="#BaseSettings-84"><span class="linenos">84</span></a>            <span class="n">on_shutdown</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">on_shutdown</span><span class="p">,</span>
+</span><span id="BaseSettings-85"><a href="#BaseSettings-85"><span class="linenos">85</span></a>            <span class="n">job_serializer</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">secure_serializer</span><span class="p">,</span>
+</span><span id="BaseSettings-86"><a href="#BaseSettings-86"><span class="linenos">86</span></a>            <span class="n">job_deserializer</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">secure_deserializer</span><span class="p">,</span>
+</span><span id="BaseSettings-87"><a href="#BaseSettings-87"><span class="linenos">87</span></a>            <span class="n">create_pool</span><span class="o">=</span><span class="k">lambda</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Broker</span><span class="p">(</span>
+</span><span id="BaseSettings-88"><a href="#BaseSettings-88"><span class="linenos">88</span></a>                <span class="n">redis_settings</span><span class="o">=</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;redis_settings&quot;</span><span class="p">],</span>
+</span><span id="BaseSettings-89"><a href="#BaseSettings-89"><span class="linenos">89</span></a>                <span class="n">packj</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">secure_serializer</span><span class="p">,</span>
+</span><span id="BaseSettings-90"><a href="#BaseSettings-90"><span class="linenos">90</span></a>                <span class="n">unpackj</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">secure_deserializer</span><span class="p">,</span>
+</span><span id="BaseSettings-91"><a href="#BaseSettings-91"><span class="linenos">91</span></a>                <span class="n">kwargs</span><span class="o">=</span><span class="n">kwargs</span><span class="p">,</span>
+</span><span id="BaseSettings-92"><a href="#BaseSettings-92"><span class="linenos">92</span></a>            <span class="p">),</span>
+</span><span id="BaseSettings-93"><a href="#BaseSettings-93"><span class="linenos">93</span></a>        <span class="p">)</span>
+</span><span id="BaseSettings-94"><a href="#BaseSettings-94"><span class="linenos">94</span></a>        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">clsname</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">nattrs</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -469,19 +511,19 @@ serialization and parsing.</p>
 
     </div>
     <a class="headerlink" href="#BaseSettings.on_startup"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings.on_startup-27"><a href="#BaseSettings.on_startup-27"><span class="linenos">27</span></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">on_startup</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">):</span>
-</span><span id="BaseSettings.on_startup-28"><a href="#BaseSettings.on_startup-28"><span class="linenos">28</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings.on_startup-29"><a href="#BaseSettings.on_startup-29"><span class="linenos">29</span></a><span class="sd">        Starts the thread and process pool executors for downstream synchronous job</span>
-</span><span id="BaseSettings.on_startup-30"><a href="#BaseSettings.on_startup-30"><span class="linenos">30</span></a><span class="sd">        execution.</span>
-</span><span id="BaseSettings.on_startup-31"><a href="#BaseSettings.on_startup-31"><span class="linenos">31</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="BaseSettings.on_startup-32"><a href="#BaseSettings.on_startup-32"><span class="linenos">32</span></a>        <span class="k">with</span> <span class="n">styled_text</span><span class="p">(</span><span class="n">Fore</span><span class="o">.</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">Style</span><span class="o">.</span><span class="n">DIM</span><span class="p">):</span>
-</span><span id="BaseSettings.on_startup-33"><a href="#BaseSettings.on_startup-33"><span class="linenos">33</span></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[justjobs] Starting executors...&quot;</span><span class="p">)</span>
-</span><span id="BaseSettings.on_startup-34"><a href="#BaseSettings.on_startup-34"><span class="linenos">34</span></a>
-</span><span id="BaseSettings.on_startup-35"><a href="#BaseSettings.on_startup-35"><span class="linenos">35</span></a>        <span class="c1"># we&#39;re ok creating pools for all the types since the executors don&#39;t</span>
-</span><span id="BaseSettings.on_startup-36"><a href="#BaseSettings.on_startup-36"><span class="linenos">36</span></a>        <span class="c1"># spin up the threads / processes unless a task is scheduled to run in one</span>
-</span><span id="BaseSettings.on_startup-37"><a href="#BaseSettings.on_startup-37"><span class="linenos">37</span></a>        <span class="n">ctx</span><span class="p">[</span><span class="s2">&quot;_executors&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="BaseSettings.on_startup-38"><a href="#BaseSettings.on_startup-38"><span class="linenos">38</span></a>            <span class="n">jtype</span><span class="p">:</span> <span class="n">jtype</span><span class="o">.</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">](</span><span class="n">max_workers</span><span class="o">=</span><span class="n">jtype</span><span class="o">.</span><span class="n">value</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">jtype</span> <span class="ow">in</span> <span class="n">JobType</span>
-</span><span id="BaseSettings.on_startup-39"><a href="#BaseSettings.on_startup-39"><span class="linenos">39</span></a>        <span class="p">}</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings.on_startup-26"><a href="#BaseSettings.on_startup-26"><span class="linenos">26</span></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">on_startup</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">):</span>
+</span><span id="BaseSettings.on_startup-27"><a href="#BaseSettings.on_startup-27"><span class="linenos">27</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="BaseSettings.on_startup-28"><a href="#BaseSettings.on_startup-28"><span class="linenos">28</span></a><span class="sd">        Starts the thread and process pool executors for downstream synchronous job</span>
+</span><span id="BaseSettings.on_startup-29"><a href="#BaseSettings.on_startup-29"><span class="linenos">29</span></a><span class="sd">        execution.</span>
+</span><span id="BaseSettings.on_startup-30"><a href="#BaseSettings.on_startup-30"><span class="linenos">30</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="BaseSettings.on_startup-31"><a href="#BaseSettings.on_startup-31"><span class="linenos">31</span></a>        <span class="k">with</span> <span class="n">styled_text</span><span class="p">(</span><span class="n">Fore</span><span class="o">.</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">Style</span><span class="o">.</span><span class="n">DIM</span><span class="p">):</span>
+</span><span id="BaseSettings.on_startup-32"><a href="#BaseSettings.on_startup-32"><span class="linenos">32</span></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[justjobs] Starting executors...&quot;</span><span class="p">)</span>
+</span><span id="BaseSettings.on_startup-33"><a href="#BaseSettings.on_startup-33"><span class="linenos">33</span></a>
+</span><span id="BaseSettings.on_startup-34"><a href="#BaseSettings.on_startup-34"><span class="linenos">34</span></a>        <span class="c1"># we&#39;re ok creating pools for all the types since the executors don&#39;t</span>
+</span><span id="BaseSettings.on_startup-35"><a href="#BaseSettings.on_startup-35"><span class="linenos">35</span></a>        <span class="c1"># spin up the threads / processes unless a task is scheduled to run in one</span>
+</span><span id="BaseSettings.on_startup-36"><a href="#BaseSettings.on_startup-36"><span class="linenos">36</span></a>        <span class="n">ctx</span><span class="p">[</span><span class="s2">&quot;_executors&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="BaseSettings.on_startup-37"><a href="#BaseSettings.on_startup-37"><span class="linenos">37</span></a>            <span class="n">jtype</span><span class="p">:</span> <span class="n">jtype</span><span class="o">.</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">](</span><span class="n">max_workers</span><span class="o">=</span><span class="n">jtype</span><span class="o">.</span><span class="n">value</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">jtype</span> <span class="ow">in</span> <span class="n">JobType</span>
+</span><span id="BaseSettings.on_startup-38"><a href="#BaseSettings.on_startup-38"><span class="linenos">38</span></a>        <span class="p">}</span>
 </span></pre></div>
 
 
@@ -502,15 +544,17 @@ execution.</p>
 
     </div>
     <a class="headerlink" href="#BaseSettings.on_shutdown"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings.on_shutdown-41"><a href="#BaseSettings.on_shutdown-41"><span class="linenos">41</span></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">on_shutdown</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">):</span>
-</span><span id="BaseSettings.on_shutdown-42"><a href="#BaseSettings.on_shutdown-42"><span class="linenos">42</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings.on_shutdown-43"><a href="#BaseSettings.on_shutdown-43"><span class="linenos">43</span></a><span class="sd">        Gracefully shuts down the available thread and process pool executors.</span>
-</span><span id="BaseSettings.on_shutdown-44"><a href="#BaseSettings.on_shutdown-44"><span class="linenos">44</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="BaseSettings.on_shutdown-45"><a href="#BaseSettings.on_shutdown-45"><span class="linenos">45</span></a>        <span class="k">for</span> <span class="n">executor</span> <span class="ow">in</span> <span class="n">ctx</span><span class="p">[</span><span class="s2">&quot;_executors&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-</span><span id="BaseSettings.on_shutdown-46"><a href="#BaseSettings.on_shutdown-46"><span class="linenos">46</span></a>            <span class="n">executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span><span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="BaseSettings.on_shutdown-47"><a href="#BaseSettings.on_shutdown-47"><span class="linenos">47</span></a>
-</span><span id="BaseSettings.on_shutdown-48"><a href="#BaseSettings.on_shutdown-48"><span class="linenos">48</span></a>        <span class="k">with</span> <span class="n">styled_text</span><span class="p">(</span><span class="n">Fore</span><span class="o">.</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">Style</span><span class="o">.</span><span class="n">DIM</span><span class="p">):</span>
-</span><span id="BaseSettings.on_shutdown-49"><a href="#BaseSettings.on_shutdown-49"><span class="linenos">49</span></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[justjobs] Gracefully shutdown executors ✔&quot;</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings.on_shutdown-40"><a href="#BaseSettings.on_shutdown-40"><span class="linenos">40</span></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">on_shutdown</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">):</span>
+</span><span id="BaseSettings.on_shutdown-41"><a href="#BaseSettings.on_shutdown-41"><span class="linenos">41</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="BaseSettings.on_shutdown-42"><a href="#BaseSettings.on_shutdown-42"><span class="linenos">42</span></a><span class="sd">        Gracefully shuts down the available thread and process pool executors.</span>
+</span><span id="BaseSettings.on_shutdown-43"><a href="#BaseSettings.on_shutdown-43"><span class="linenos">43</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="BaseSettings.on_shutdown-44"><a href="#BaseSettings.on_shutdown-44"><span class="linenos">44</span></a>        <span class="k">for</span> <span class="n">executor</span> <span class="ow">in</span> <span class="n">ctx</span><span class="p">[</span><span class="s2">&quot;_executors&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+</span><span id="BaseSettings.on_shutdown-45"><a href="#BaseSettings.on_shutdown-45"><span class="linenos">45</span></a>            <span class="n">executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span><span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="BaseSettings.on_shutdown-46"><a href="#BaseSettings.on_shutdown-46"><span class="linenos">46</span></a>
+</span><span id="BaseSettings.on_shutdown-47"><a href="#BaseSettings.on_shutdown-47"><span class="linenos">47</span></a>        <span class="k">del</span> <span class="n">ctx</span><span class="p">[</span><span class="s2">&quot;_executors&quot;</span><span class="p">]</span>
+</span><span id="BaseSettings.on_shutdown-48"><a href="#BaseSettings.on_shutdown-48"><span class="linenos">48</span></a>
+</span><span id="BaseSettings.on_shutdown-49"><a href="#BaseSettings.on_shutdown-49"><span class="linenos">49</span></a>        <span class="k">with</span> <span class="n">styled_text</span><span class="p">(</span><span class="n">Fore</span><span class="o">.</span><span class="n">BLUE</span><span class="p">,</span> <span class="n">Style</span><span class="o">.</span><span class="n">DIM</span><span class="p">):</span>
+</span><span id="BaseSettings.on_shutdown-50"><a href="#BaseSettings.on_shutdown-50"><span class="linenos">50</span></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[justjobs] Gracefully shutdown executors ✔&quot;</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -530,18 +574,18 @@ execution.</p>
 
     </div>
     <a class="headerlink" href="#BaseSettings.secure_serializer"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings.secure_serializer-51"><a href="#BaseSettings.secure_serializer-51"><span class="linenos">51</span></a>    <span class="k">def</span> <span class="nf">secure_serializer</span><span class="p">(</span><span class="n">job</span><span class="p">):</span>
-</span><span id="BaseSettings.secure_serializer-52"><a href="#BaseSettings.secure_serializer-52"><span class="linenos">52</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings.secure_serializer-53"><a href="#BaseSettings.secure_serializer-53"><span class="linenos">53</span></a><span class="sd">        Efficiently serializes the given job using dill and signs it using</span>
-</span><span id="BaseSettings.secure_serializer-54"><a href="#BaseSettings.secure_serializer-54"><span class="linenos">54</span></a><span class="sd">        blake2b. During execution the signature is extracted and compare to the</span>
-</span><span id="BaseSettings.secure_serializer-55"><a href="#BaseSettings.secure_serializer-55"><span class="linenos">55</span></a><span class="sd">        job function to ensure the intended job is run.</span>
-</span><span id="BaseSettings.secure_serializer-56"><a href="#BaseSettings.secure_serializer-56"><span class="linenos">56</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="BaseSettings.secure_serializer-57"><a href="#BaseSettings.secure_serializer-57"><span class="linenos">57</span></a>        <span class="n">serialized</span> <span class="o">=</span> <span class="n">dill</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
-</span><span id="BaseSettings.secure_serializer-58"><a href="#BaseSettings.secure_serializer-58"><span class="linenos">58</span></a>        <span class="n">signer</span> <span class="o">=</span> <span class="n">blake2b</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">SERIALIZATION_SECRET</span><span class="p">)</span>
-</span><span id="BaseSettings.secure_serializer-59"><a href="#BaseSettings.secure_serializer-59"><span class="linenos">59</span></a>        <span class="n">signer</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
-</span><span id="BaseSettings.secure_serializer-60"><a href="#BaseSettings.secure_serializer-60"><span class="linenos">60</span></a>        <span class="c1"># must be hexdigest to ensure no premature byte delimiters</span>
-</span><span id="BaseSettings.secure_serializer-61"><a href="#BaseSettings.secure_serializer-61"><span class="linenos">61</span></a>        <span class="n">sig</span> <span class="o">=</span> <span class="n">signer</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
-</span><span id="BaseSettings.secure_serializer-62"><a href="#BaseSettings.secure_serializer-62"><span class="linenos">62</span></a>        <span class="k">return</span> <span class="p">(</span><span class="n">sig</span> <span class="o">+</span> <span class="s2">&quot;|&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="n">serialized</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings.secure_serializer-52"><a href="#BaseSettings.secure_serializer-52"><span class="linenos">52</span></a>    <span class="k">def</span> <span class="nf">secure_serializer</span><span class="p">(</span><span class="n">job</span><span class="p">):</span>
+</span><span id="BaseSettings.secure_serializer-53"><a href="#BaseSettings.secure_serializer-53"><span class="linenos">53</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="BaseSettings.secure_serializer-54"><a href="#BaseSettings.secure_serializer-54"><span class="linenos">54</span></a><span class="sd">        Efficiently serializes the given job using dill and signs it using</span>
+</span><span id="BaseSettings.secure_serializer-55"><a href="#BaseSettings.secure_serializer-55"><span class="linenos">55</span></a><span class="sd">        blake2b. During execution the signature is extracted and compare to the</span>
+</span><span id="BaseSettings.secure_serializer-56"><a href="#BaseSettings.secure_serializer-56"><span class="linenos">56</span></a><span class="sd">        job function to ensure the intended job is run.</span>
+</span><span id="BaseSettings.secure_serializer-57"><a href="#BaseSettings.secure_serializer-57"><span class="linenos">57</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="BaseSettings.secure_serializer-58"><a href="#BaseSettings.secure_serializer-58"><span class="linenos">58</span></a>        <span class="n">serialized</span> <span class="o">=</span> <span class="n">dill</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+</span><span id="BaseSettings.secure_serializer-59"><a href="#BaseSettings.secure_serializer-59"><span class="linenos">59</span></a>        <span class="n">signer</span> <span class="o">=</span> <span class="n">blake2b</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">SERIALIZATION_SECRET</span><span class="p">)</span>
+</span><span id="BaseSettings.secure_serializer-60"><a href="#BaseSettings.secure_serializer-60"><span class="linenos">60</span></a>        <span class="n">signer</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
+</span><span id="BaseSettings.secure_serializer-61"><a href="#BaseSettings.secure_serializer-61"><span class="linenos">61</span></a>        <span class="c1"># must be hexdigest to ensure no premature byte delimiters</span>
+</span><span id="BaseSettings.secure_serializer-62"><a href="#BaseSettings.secure_serializer-62"><span class="linenos">62</span></a>        <span class="n">sig</span> <span class="o">=</span> <span class="n">signer</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+</span><span id="BaseSettings.secure_serializer-63"><a href="#BaseSettings.secure_serializer-63"><span class="linenos">63</span></a>        <span class="k">return</span> <span class="p">(</span><span class="n">sig</span> <span class="o">+</span> <span class="s2">&quot;|&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="n">serialized</span>
 </span></pre></div>
 
 
@@ -563,62 +607,26 @@ job function to ensure the intended job is run.</p>
 
     </div>
     <a class="headerlink" href="#BaseSettings.secure_deserializer"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings.secure_deserializer-64"><a href="#BaseSettings.secure_deserializer-64"><span class="linenos">64</span></a>    <span class="k">def</span> <span class="nf">secure_deserializer</span><span class="p">(</span><span class="n">packed</span><span class="p">):</span>
-</span><span id="BaseSettings.secure_deserializer-65"><a href="#BaseSettings.secure_deserializer-65"><span class="linenos">65</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings.secure_deserializer-66"><a href="#BaseSettings.secure_deserializer-66"><span class="linenos">66</span></a><span class="sd">        Extracts the signature from the serialized job and compares it with the job</span>
-</span><span id="BaseSettings.secure_deserializer-67"><a href="#BaseSettings.secure_deserializer-67"><span class="linenos">67</span></a><span class="sd">        function. If the signatures match, the job is deserialized and executed. If</span>
-</span><span id="BaseSettings.secure_deserializer-68"><a href="#BaseSettings.secure_deserializer-68"><span class="linenos">68</span></a><span class="sd">        not, an error is raised.</span>
-</span><span id="BaseSettings.secure_deserializer-69"><a href="#BaseSettings.secure_deserializer-69"><span class="linenos">69</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="BaseSettings.secure_deserializer-70"><a href="#BaseSettings.secure_deserializer-70"><span class="linenos">70</span></a>        <span class="n">sig</span><span class="p">,</span> <span class="n">serialized</span> <span class="o">=</span> <span class="n">packed</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;|&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-</span><span id="BaseSettings.secure_deserializer-71"><a href="#BaseSettings.secure_deserializer-71"><span class="linenos">71</span></a>        <span class="n">signer</span> <span class="o">=</span> <span class="n">blake2b</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">SERIALIZATION_SECRET</span><span class="p">)</span>
-</span><span id="BaseSettings.secure_deserializer-72"><a href="#BaseSettings.secure_deserializer-72"><span class="linenos">72</span></a>        <span class="n">signer</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
-</span><span id="BaseSettings.secure_deserializer-73"><a href="#BaseSettings.secure_deserializer-73"><span class="linenos">73</span></a>        <span class="k">assert</span> <span class="n">compare_digest</span><span class="p">(</span>
-</span><span id="BaseSettings.secure_deserializer-74"><a href="#BaseSettings.secure_deserializer-74"><span class="linenos">74</span></a>            <span class="n">sig</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">),</span> <span class="n">signer</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
-</span><span id="BaseSettings.secure_deserializer-75"><a href="#BaseSettings.secure_deserializer-75"><span class="linenos">75</span></a>        <span class="p">),</span> <span class="s2">&quot;Invalid job signature! Has someone tampered with your job queue?&quot;</span>
-</span><span id="BaseSettings.secure_deserializer-76"><a href="#BaseSettings.secure_deserializer-76"><span class="linenos">76</span></a>
-</span><span id="BaseSettings.secure_deserializer-77"><a href="#BaseSettings.secure_deserializer-77"><span class="linenos">77</span></a>        <span class="k">return</span> <span class="n">dill</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings.secure_deserializer-65"><a href="#BaseSettings.secure_deserializer-65"><span class="linenos">65</span></a>    <span class="k">def</span> <span class="nf">secure_deserializer</span><span class="p">(</span><span class="n">packed</span><span class="p">):</span>
+</span><span id="BaseSettings.secure_deserializer-66"><a href="#BaseSettings.secure_deserializer-66"><span class="linenos">66</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="BaseSettings.secure_deserializer-67"><a href="#BaseSettings.secure_deserializer-67"><span class="linenos">67</span></a><span class="sd">        Extracts the signature from the serialized job and compares it with the job</span>
+</span><span id="BaseSettings.secure_deserializer-68"><a href="#BaseSettings.secure_deserializer-68"><span class="linenos">68</span></a><span class="sd">        function. If the signatures match, the job is deserialized and executed. If</span>
+</span><span id="BaseSettings.secure_deserializer-69"><a href="#BaseSettings.secure_deserializer-69"><span class="linenos">69</span></a><span class="sd">        not, an error is raised.</span>
+</span><span id="BaseSettings.secure_deserializer-70"><a href="#BaseSettings.secure_deserializer-70"><span class="linenos">70</span></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="BaseSettings.secure_deserializer-71"><a href="#BaseSettings.secure_deserializer-71"><span class="linenos">71</span></a>        <span class="n">sig</span><span class="p">,</span> <span class="n">serialized</span> <span class="o">=</span> <span class="n">packed</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;|&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</span><span id="BaseSettings.secure_deserializer-72"><a href="#BaseSettings.secure_deserializer-72"><span class="linenos">72</span></a>        <span class="n">signer</span> <span class="o">=</span> <span class="n">blake2b</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">SERIALIZATION_SECRET</span><span class="p">)</span>
+</span><span id="BaseSettings.secure_deserializer-73"><a href="#BaseSettings.secure_deserializer-73"><span class="linenos">73</span></a>        <span class="n">signer</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
+</span><span id="BaseSettings.secure_deserializer-74"><a href="#BaseSettings.secure_deserializer-74"><span class="linenos">74</span></a>        <span class="k">assert</span> <span class="n">compare_digest</span><span class="p">(</span>
+</span><span id="BaseSettings.secure_deserializer-75"><a href="#BaseSettings.secure_deserializer-75"><span class="linenos">75</span></a>            <span class="n">sig</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">),</span> <span class="n">signer</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+</span><span id="BaseSettings.secure_deserializer-76"><a href="#BaseSettings.secure_deserializer-76"><span class="linenos">76</span></a>        <span class="p">),</span> <span class="s2">&quot;Invalid job signature! Has someone tampered with your job queue?&quot;</span>
+</span><span id="BaseSettings.secure_deserializer-77"><a href="#BaseSettings.secure_deserializer-77"><span class="linenos">77</span></a>
+</span><span id="BaseSettings.secure_deserializer-78"><a href="#BaseSettings.secure_deserializer-78"><span class="linenos">78</span></a>        <span class="k">return</span> <span class="n">dill</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">serialized</span><span class="p">)</span>
 </span></pre></div>
 
 
             <div class="docstring"><p>Extracts the signature from the serialized job and compares it with the job
 function. If the signatures match, the job is deserialized and executed. If
 not, an error is raised.</p>
-</div>
-
-
-                            </div>
-                            <div id="BaseSettings.create_broker" class="classattr">
-                                        <input id="BaseSettings.create_broker-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
-<div class="attr function">
-            
-        <span class="def">def</span>
-        <span class="name">create_broker</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">redis_settings</span><span class="p">:</span> <span class="n">arq</span><span class="o">.</span><span class="n">connections</span><span class="o">.</span><span class="n">RedisSettings</span></span><span class="return-annotation">):</span></span>
-
-                <label class="view-source-button" for="BaseSettings.create_broker-view-source"><span>View Source</span></label>
-
-    </div>
-    <a class="headerlink" href="#BaseSettings.create_broker"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="BaseSettings.create_broker-79"><a href="#BaseSettings.create_broker-79"><span class="linenos">79</span></a>    <span class="k">def</span> <span class="nf">create_broker</span><span class="p">(</span><span class="n">redis_settings</span><span class="p">:</span> <span class="n">RedisSettings</span><span class="p">):</span>
-</span><span id="BaseSettings.create_broker-80"><a href="#BaseSettings.create_broker-80"><span class="linenos">80</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="BaseSettings.create_broker-81"><a href="#BaseSettings.create_broker-81"><span class="linenos">81</span></a><span class="sd">        Creates a ArqRedis client via `create_pool` using the class&#39;s defined</span>
-</span><span id="BaseSettings.create_broker-82"><a href="#BaseSettings.create_broker-82"><span class="linenos">82</span></a><span class="sd">        `redis_settings` and secure serialization logic.</span>
-</span><span id="BaseSettings.create_broker-83"><a href="#BaseSettings.create_broker-83"><span class="linenos">83</span></a><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="BaseSettings.create_broker-84"><a href="#BaseSettings.create_broker-84"><span class="linenos">84</span></a>
-</span><span id="BaseSettings.create_broker-85"><a href="#BaseSettings.create_broker-85"><span class="linenos">85</span></a>        <span class="k">async</span> <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-</span><span id="BaseSettings.create_broker-86"><a href="#BaseSettings.create_broker-86"><span class="linenos">86</span></a>            <span class="k">nonlocal</span> <span class="n">redis_settings</span>
-</span><span id="BaseSettings.create_broker-87"><a href="#BaseSettings.create_broker-87"><span class="linenos">87</span></a>            <span class="k">return</span> <span class="k">await</span> <span class="n">create_pool</span><span class="p">(</span>
-</span><span id="BaseSettings.create_broker-88"><a href="#BaseSettings.create_broker-88"><span class="linenos">88</span></a>                <span class="n">redis_settings</span><span class="p">,</span>
-</span><span id="BaseSettings.create_broker-89"><a href="#BaseSettings.create_broker-89"><span class="linenos">89</span></a>                <span class="n">job_serializer</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">secure_serializer</span><span class="p">,</span>
-</span><span id="BaseSettings.create_broker-90"><a href="#BaseSettings.create_broker-90"><span class="linenos">90</span></a>                <span class="n">job_deserializer</span><span class="o">=</span><span class="n">BaseSettings</span><span class="o">.</span><span class="n">secure_deserializer</span><span class="p">,</span>
-</span><span id="BaseSettings.create_broker-91"><a href="#BaseSettings.create_broker-91"><span class="linenos">91</span></a>                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-</span><span id="BaseSettings.create_broker-92"><a href="#BaseSettings.create_broker-92"><span class="linenos">92</span></a>            <span class="p">)</span>
-</span><span id="BaseSettings.create_broker-93"><a href="#BaseSettings.create_broker-93"><span class="linenos">93</span></a>
-</span><span id="BaseSettings.create_broker-94"><a href="#BaseSettings.create_broker-94"><span class="linenos">94</span></a>        <span class="k">return</span> <span class="n">wrapper</span>
-</span></pre></div>
-
-
-            <div class="docstring"><p>Creates a ArqRedis client via <code>create_pool</code> using the class's defined
-<code>redis_settings</code> and secure serialization logic.</p>
 </div>
 
 

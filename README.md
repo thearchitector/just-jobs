@@ -19,30 +19,73 @@ $ pip install --user just-jobs
 just-jobs doesn't aim to replace the invocations that arq provides, only wrap some of them to make job creation and execution easier and better. It lets you:
 
 - Define and run non-async jobs. Passing a non-async `@job` function to arq will run properly. Non-async jobs can also be defined as either IO-bound or CPU-bound, which changes how the job will be executed to prevent blocking the asyncio event loop.
-- Specify a single `RedisSettings` within your `WorkerSettings` which you can create a pool from with `Settings.create_broker()`.
+- Specify a single `RedisSettings` within your `WorkerSettings` from which you can create a pool using `Settings.create_pool()`.
 - Run jobs either immediately with the `.now()` function or via normal arq enqueueing.
 - Use non-pickable job arguments and kwargs through the [dill](http://dill.rtfd.io/) library.
 
-Because the aim is simplicity, just-jobs makes some opinionated design decisions. Namely:
-
-- If defining a sync job, you must declare it as either `IO_BOUND` or `CPU_BOUND` so just-jobs knows how to optimally run it. This helps ensure that the arq process event loop is never blocked while encouraging thoughtful and intentional job design.
-- You cannot override the job serialization logic or lifecycle hooks of `BaseSettings`. Jobs are serialized using dill (to support a wider range of arguments) and are always signed for security.
-
 ## Usage
 
-Using just-jobs is pretty straight forward:
+Using just-jobs is pretty straight forward.
 
-1. Adding `@job()` to any function will turn it into job that can be delayed by `arq`.
+### Add `@job()` to any function to make it a delayable job.
 
-2. If the job is sync, specify it's type like `@job(job_type=JobType.IO_BOUND)`.
+If the job is synchronous, specify its job type so just-jobs knows how to optimally run it. If you don't, you'll get an error. This helps encourage thoughtful and intentional job design while ensuring that the event loop is never blocked.
 
-3. If you only want to write one function but need to occasionally invoke it immediately, use `await yourjob.now(...)`.
+```python
+@job(job_type=JobType.CPU_BOUND)
+def complex_math(ctx: Context, i: int, j: int, k: int)
+```
 
-4. Create your worker settings by specifying `metaclass=BaseSettings` to your settings class.
+If it's a coroutine function, you don't need to specify a job type (and will get a warning if you do). This might change in the future to support asynchronous CPU-bound tasks.
 
-### Example
+```python
+@job()
+async def poll_reddit(ctx: Context, subr: str)
+```
 
-The complete example (with the `__main__` check) is available at [tests/example.py](tests/example.py) and should work out of the box. The snippet below is just an excerpt of the features described above:
+### Use `.now` if you want to run the job immediately.
+
+Using `.now` allows you to run the job as if it were a normal function. If you rely on the `ctx`, you'll have to include conditional logic to handle its absence.
+
+```python
+await complex_math.now(1, 1, 2)
+await poll_reddit.now("r/Python")
+```
+
+### Define WorkerSettings using the `BaseSettings` metaclass.
+
+The execution logic that `@job` provides requires some stuff. When you defining your WorkerSettings, you must declare `BaseSettings` as its metaclass to ensure it exists.
+
+```python
+class Settings(metaclass=BaseSettings):
+    redis_settings = ...
+```
+
+### Use `Settings.create_pool()`.
+
+While you may elect to use `arq.connections.create_pool` as you would normally, using the `create_pool` function provided by your `Settings` class ensures the pool it creates always matches your worker's Redis settings. It also lets you take advantage of additional functionality, namely that it can be used as an auto-closing context manager.
+
+```python
+# manually
+pool = await Settings.create_pool()
+await pool.close(close_connection_pool=True)
+
+# or as an async context manager
+async with Settings.create_pool() as pool:
+    ...
+```
+
+### Enqueue your job.
+
+just-jobs doesn't change the way in which you enqueue your jobs. Just use `await pool.enqueue_job(...)` as you would normally.
+
+```python
+await pool.enqueue_job('complex_math', 2, 1, 3)
+```
+
+## Example
+
+The complete example is available at [docs/example.py](docs/example.py) and should work out of the box. The snippet below is just an excerpt of the features described above:
 
 ```python
 from just_jobs import BaseSettings, Context, JobType, job
@@ -63,14 +106,16 @@ class Settings(metaclass=BaseSettings):
     redis_settings = RedisSettings(host="redis")
 
 async def main():
-    # create a redis broker using the Settings already defined
-    broker = await Settings.create_broker()
+    # create a Redis pool using the Settings already defined
+    pool = await Settings.create_pool()
     # run the_task right now and return the url
     # even though this is a sync function, `.now` returns an awaitable
-    url = await sync_task.now("https://www.google.com")
+    url = await sync_task.now("https://www.theglassfiles.com")
 
-    await broker.enqueue_job("async_task", "https://gianturl.net")
-    await broker.enqueue_job("sync_task", "https://gianturl.net")
+    await pool.enqueue_job("async_task", "https://www.eliasfgabriel.com")
+    await pool.enqueue_job("sync_task", "https://gianturl.net")
+
+    await pool.close(close_connection_pool=True)
 ```
 
 ## License

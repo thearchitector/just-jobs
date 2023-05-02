@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from typing import Generator
 
 from colorama import Style, just_fix_windows_console
 
@@ -6,7 +7,7 @@ just_fix_windows_console()
 
 
 @contextmanager
-def styled_text(*ansi_codes: str):
+def styled_text(*ansi_codes: str) -> Generator[None, None, None]:
     """
     Provides a context manager for temporarily printing styled text. The provided
     styles are applied and then reset when the block is exited.

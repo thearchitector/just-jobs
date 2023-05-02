@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Generator, Optional, cast
 
 from arq import create_pool
 from arq.connections import ArqRedis, RedisSettings
@@ -16,11 +16,11 @@ class Broker:
     redis_settings: RedisSettings
     packj: Callable[[Any], bytes] = field(repr=False)
     unpackj: Callable[[bytes], Any] = field(repr=False)
-    kwargs: Dict
+    kwargs: Dict[str, Any]
 
-    _pool: ArqRedis = field(repr=False, init=False, default=None)
+    _pool: Optional[ArqRedis] = field(repr=False, init=False, default=None)
 
-    async def pool(self):
+    async def pool(self) -> ArqRedis:
         if not self._pool:
             self._pool = await create_pool(
                 self.redis_settings,
@@ -31,11 +31,11 @@ class Broker:
 
         return self._pool
 
-    def __await__(self):
+    def __await__(self) -> Generator[Any, None, ArqRedis]:
         return self.pool().__await__()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> ArqRedis:
         return await self.pool()
 
-    async def __aexit__(self, *_):
-        await self._pool.close(close_connection_pool=True)
+    async def __aexit__(self, *_: Any) -> None:
+        await cast(ArqRedis, self._pool).close(close_connection_pool=True)

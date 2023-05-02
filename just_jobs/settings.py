@@ -1,8 +1,9 @@
 import os
 from hashlib import blake2b
 from secrets import compare_digest
+from typing import Any, Tuple
 
-import dill
+import dill  # type: ignore
 from colorama import Fore, Style
 
 from .broker import Broker
@@ -10,9 +11,9 @@ from .job_type import JobType
 from .typing import Context
 from .utils import styled_text
 
-SERIALIZATION_SECRET = os.getenv("JOB_SERIALIZATION_SECRET", "thisisasecret").encode(
-    "utf-8"
-)
+SERIALIZATION_SECRET: bytes = os.getenv(
+    "JOB_SERIALIZATION_SECRET", "thisisasecret"
+).encode("utf-8")
 
 
 class BaseSettings(type):
@@ -22,7 +23,8 @@ class BaseSettings(type):
     serialization and parsing.
     """
 
-    async def on_startup(ctx: Context):
+    @staticmethod
+    async def on_startup(ctx: Context) -> None:
         """
         Starts the thread and process pool executors for downstream synchronous job
         execution.
@@ -36,7 +38,8 @@ class BaseSettings(type):
             jtype: jtype.value[0](max_workers=jtype.value[1]) for jtype in JobType
         }
 
-    async def on_shutdown(ctx: Context):
+    @staticmethod
+    async def on_shutdown(ctx: Context) -> None:
         """
         Gracefully shuts down the available thread and process pool executors.
         """
@@ -48,20 +51,22 @@ class BaseSettings(type):
         with styled_text(Fore.BLUE, Style.DIM):
             print("[justjobs] Gracefully shutdown executors ✔")
 
-    def secure_serializer(job):
+    @staticmethod
+    def secure_serializer(job: Any) -> bytes:
         """
         Efficiently serializes the given job using dill and signs it using
         blake2b. During execution the signature is extracted and compare to the
         job function to ensure the intended job is run.
         """
-        serialized = dill.dumps(job)
+        serialized: bytes = dill.dumps(job)
         signer = blake2b(key=SERIALIZATION_SECRET)
         signer.update(serialized)
         # must be hexdigest to ensure no premature byte delimiters
         sig = signer.hexdigest()
         return (sig + "|").encode("utf-8") + serialized
 
-    def secure_deserializer(packed):
+    @staticmethod
+    def secure_deserializer(packed: bytes) -> Any:
         """
         Extracts the signature from the serialized job and compares it with the job
         function. If the signatures match, the job is deserialized and executed. If
@@ -78,7 +83,7 @@ class BaseSettings(type):
 
         return dill.loads(serialized)
 
-    def __new__(cls, clsname, bases, attrs):
+    def __new__(cls, clsname: str, bases: Tuple[Any, ...], attrs: Any) -> type:
         nattrs = dict(
             **attrs,
             on_startup=BaseSettings.on_startup,

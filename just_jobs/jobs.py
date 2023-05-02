@@ -2,20 +2,27 @@ import asyncio
 import inspect
 import warnings
 from functools import partial, wraps
-from typing import Callable, Coroutine, Optional
+from typing import Any, Awaitable, Callable, Optional, cast
 
-import dill
+import dill  # type: ignore
 from colorama import Fore, Style
 
 from .job_type import JobType
-from .typing import Context
+from .typing import (
+    ArgsType,
+    ArqCallable,
+    Context,
+    DecoratorCallable,
+    KwargsType,
+    ReturnType,
+)
 from .utils import styled_text
 
 
-# TODO: should probably be a class?
+# TODO: should be a class?
 def job(
     job_type: Optional[JobType] = None,
-) -> Callable[..., Callable[..., Coroutine]]:
+) -> Callable[[ArqCallable[ReturnType]], DecoratorCallable[ReturnType]]:
     """
     Creates an async enqueueable job from the provided function. The function may be
     synchronous or a coroutine. If synchronous, the job will be run in either a thread
@@ -25,7 +32,7 @@ def job(
     specified for a coroutine, a warning will be thrown (but will still execute).
     """
 
-    def decorator(func: Callable) -> Coroutine:
+    def decorator(func: ArqCallable[ReturnType]) -> DecoratorCallable[ReturnType]:
         iscoro = inspect.iscoroutinefunction(func)
         if iscoro:
             # async jobs always run in the thread of the event loop, even if
@@ -42,7 +49,7 @@ def job(
                 " or CPU-bound via a JobType."
             )
 
-        async def now(*args, **kwargs):
+        async def now(*args: ArgsType, **kwargs: KwargsType) -> ReturnType:
             """
             Runs the job immediately with a `context` argument set to None. If either
             the job or the result of the job is an asynchronous coroutine, it will
@@ -50,13 +57,15 @@ def job(
             """
             result = func(None, *args, **kwargs)
             if inspect.iscoroutine(result):
-                result = await result
-            return result
+                return await cast(Awaitable[ReturnType], result)
+            return cast(ReturnType, result)
 
         setattr(func, "now", now)
 
         @wraps(func)
-        async def wrapper(ctx: Context, *args, **kwargs):
+        async def wrapper(
+            ctx: Context, *args: ArgsType, **kwargs: KwargsType
+        ) -> ReturnType:
             # we shouldn't / cannot pickle the redis instance nor underlying context
             # executors, so remove them from the context. this is mainly a problem
             # for CPU-bound tasks running in a process pool, but do it for both for
@@ -71,13 +80,15 @@ def job(
                         executor, _dill_executor_func, serialized
                     )
                 else:
-                    return await func(nctx, *args, **kwargs)
+                    return await cast(
+                        Awaitable[ReturnType], func(nctx, *args, **kwargs)
+                    )
 
         return wrapper
 
     return decorator
 
 
-def _dill_executor_func(serialized: bytes):
-    partial = dill.loads(serialized)
+def _dill_executor_func(serialized: bytes) -> Any:
+    partial: Callable[[], Any] = dill.loads(serialized)
     return partial()

@@ -2,6 +2,9 @@ from concurrent.futures import Executor
 
 import pytest
 
+from just_jobs import BaseSettings
+from just_jobs.broker import Broker
+
 
 def test_serialization(settings):
     payload = {"function": print, "args": set("hello world")}
@@ -35,3 +38,16 @@ async def test_lifecycle(settings, pcapture):
         assert "_executors" not in context
 
     assert target.getvalue().count("[justjobs]") == 2
+
+
+def test_create_pool(settings):
+    broker = settings.create_pool()
+    assert isinstance(broker, Broker)
+
+
+def test_create_pool_missing():
+    class Settings(metaclass=BaseSettings):
+        pass
+
+    with pytest.raises(AttributeError, match="You must first"):
+        Settings.create_pool()

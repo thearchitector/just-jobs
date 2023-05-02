@@ -2,7 +2,7 @@ import os
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from hashlib import blake2b
 from secrets import compare_digest
-from typing import Any, Tuple
+from typing import Any, Dict, Tuple
 
 import dill  # type: ignore
 from colorama import Fore, Style
@@ -26,6 +26,19 @@ class BaseSettings(type):
     using the built-in JobType and executor pool logic, as well as secure remote job
     serialization and parsing.
     """
+
+    def __new__(
+        cls, clsname: str, bases: Tuple[Any, ...], attrs: Dict[str, Any]
+    ) -> type:
+        attrs.update(
+            {
+                "on_startup": BaseSettings.on_startup,
+                "on_shutdown": BaseSettings.on_shutdown,
+                "job_serializer": BaseSettings.job_serializer,
+                "job_deserializer": BaseSettings.job_deserializer,
+            }
+        )
+        return super().__new__(cls, clsname, bases, attrs)
 
     @staticmethod
     async def on_startup(ctx: Context) -> None:
@@ -57,7 +70,7 @@ class BaseSettings(type):
             print("[justjobs] Gracefully shutdown executors ✔")
 
     @staticmethod
-    def secure_serializer(job: Any) -> bytes:
+    def job_serializer(job: Any) -> bytes:
         """
         Serializes the given job using dill and signs it using blake2b. The serialized
         job and its signature are returned for later verification.
@@ -70,7 +83,7 @@ class BaseSettings(type):
         return (sig + "|").encode("utf-8") + serialized
 
     @staticmethod
-    def secure_deserializer(packed: bytes) -> Any:
+    def job_deserializer(packed: bytes) -> Any:
         """
         Extracts the signature from the serialized job and compares it with the job
         function. If the signatures match, the job is deserialized and executed. If
@@ -87,18 +100,22 @@ class BaseSettings(type):
 
         return dill.loads(serialized)
 
-    def __new__(cls, clsname: str, bases: Tuple[Any, ...], attrs: Any) -> type:
-        nattrs = dict(
-            **attrs,
-            on_startup=BaseSettings.on_startup,
-            on_shutdown=BaseSettings.on_shutdown,
-            job_serializer=BaseSettings.secure_serializer,
-            job_deserializer=BaseSettings.secure_deserializer,
-            create_pool=lambda **kwargs: Broker(
-                redis_settings=attrs["redis_settings"],
-                packj=BaseSettings.secure_serializer,
-                unpackj=BaseSettings.secure_deserializer,
-                kwargs=kwargs,
-            ),
+    def create_pool(cls, **kwargs: Any) -> Broker:
+        """
+        Creates an ArqRedis instance using this class' RedisSettings and job
+        serializers. This function technically returns an instance of Broker,
+        so the pool creation is delayed until the returned object is either
+        awaited or entered.
+        """
+        if not hasattr(cls, "redis_settings"):
+            raise AttributeError(
+                "You must first define some RedisSettings on this worker class before"
+                " trying to create a pool from them."
+            )
+
+        return Broker(
+            redis_settings=cls.redis_settings,
+            packj=cls.job_serializer,
+            unpackj=cls.job_deserializer,
+            kwargs=kwargs,
         )
-        return super().__new__(cls, clsname, bases, nattrs)

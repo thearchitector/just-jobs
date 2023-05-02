@@ -14,7 +14,7 @@ repos:
     rev: v1.2.0
     hooks:
       - id: mypy
-        exclude: ^(tests)|(docs)
+        exclude: ^tests
         require_serial: true
         args: ["--explicit-package-bases", "--check-untyped-defs"]
         additional_dependencies:

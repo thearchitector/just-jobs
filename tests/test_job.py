@@ -1,7 +1,8 @@
 import pytest
 from arq.worker import create_worker
 
-from just_jobs import Context, JobType, job
+from just_jobs import JobType, job
+from just_jobs.typing import Context
 
 
 @job()

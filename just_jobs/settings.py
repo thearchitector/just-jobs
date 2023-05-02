@@ -1,4 +1,5 @@
 import os
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from hashlib import blake2b
 from secrets import compare_digest
 from typing import Any, Tuple
@@ -15,10 +16,13 @@ SERIALIZATION_SECRET: bytes = os.getenv(
     "JOB_SERIALIZATION_SECRET", "thisisasecret"
 ).encode("utf-8")
 
+MAX_THREAD_WORKERS = int(os.getenv("MAX_THREAD_WORKERS", 0)) or None
+MAX_PROCESS_WORKERS = int(os.getenv("MAX_PROCESS_WORKERS", 0)) or None
+
 
 class BaseSettings(type):
     """
-    A Metaclass for defining WorkerSettings to pass to an arq process. This enables
+    A metaclass for defining WorkerSettings to pass to an arq process. This enables
     using the built-in JobType and executor pool logic, as well as secure remote job
     serialization and parsing.
     """
@@ -35,7 +39,8 @@ class BaseSettings(type):
         # we're ok creating pools for all the types since the executors don't
         # spin up the threads / processes unless a task is scheduled to run in one
         ctx["_executors"] = {
-            jtype: jtype.value[0](max_workers=jtype.value[1]) for jtype in JobType
+            JobType.IO_BOUND: ThreadPoolExecutor(max_workers=MAX_THREAD_WORKERS),
+            JobType.CPU_BOUND: ProcessPoolExecutor(max_workers=MAX_PROCESS_WORKERS),
         }
 
     @staticmethod
@@ -54,9 +59,8 @@ class BaseSettings(type):
     @staticmethod
     def secure_serializer(job: Any) -> bytes:
         """
-        Efficiently serializes the given job using dill and signs it using
-        blake2b. During execution the signature is extracted and compare to the
-        job function to ensure the intended job is run.
+        Serializes the given job using dill and signs it using blake2b. The serialized
+        job and its signature are returned for later verification.
         """
         serialized: bytes = dill.dumps(job)
         signer = blake2b(key=SERIALIZATION_SECRET)

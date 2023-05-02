@@ -9,8 +9,11 @@ A friendly and lightweight wrapper for [arq](https://arq-docs.helpmanual.io). ju
 
 Documentation: <https://justjobs.thearchitector.dev>.
 
+Tested support on Python 3.7, 3.8, 3.9, and 3.10, 3.11.
+
 ```sh
-$ pdm add just-jobs # or
+$ pdm add just-jobs
+# or
 $ pip install --user just-jobs
 ```
 
@@ -21,7 +24,7 @@ just-jobs doesn't aim to replace the invocations that arq provides, only wrap so
 - Define and run non-async jobs. Passing a non-async `@job` function to arq will run properly. Non-async jobs can also be defined as either IO-bound or CPU-bound, which changes how the job will be executed to prevent blocking the asyncio event loop.
 - Specify a single `RedisSettings` within your `WorkerSettings` from which you can create a pool using `Settings.create_pool()`.
 - Run jobs either immediately with the `.now()` function or via normal arq enqueueing.
-- Use non-pickable job arguments and kwargs through the [dill](http://dill.rtfd.io/) library.
+- Use non-pickable job arguments and kwargs (supported by the [dill](http://dill.rtfd.io/) library).
 
 ## Usage
 

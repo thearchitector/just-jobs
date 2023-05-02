@@ -70,9 +70,11 @@ class BaseSettings(type):
         sig, serialized = packed.split(b"|", 1)
         signer = blake2b(key=SERIALIZATION_SECRET)
         signer.update(serialized)
-        assert compare_digest(
-            sig.decode("utf-8"), signer.hexdigest()
-        ), "Invalid job signature! Has someone tampered with your job queue?"
+
+        if not compare_digest(sig.decode("utf-8"), signer.hexdigest()):
+            raise ValueError(
+                "Invalid job signature! Has someone tampered with your job queue?"
+            )
 
         return dill.loads(serialized)
 

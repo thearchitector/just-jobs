@@ -3,26 +3,35 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v2
-      - name: Check formatting
-        uses: psf/black@stable
-      - name: Check typing
-        uses: jpetrucciani/mypy-check@master
-        with:
-          path: "just_jobs"
-          mypy_flags: "--follow-imports=silent --ignore-missing-imports --non-interactive --install-types --pretty --check"
-
   test:
     runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
-    name: tests
+      matrix:
+        python-version: [3.7, 3.8, 3.9, "3.10", "3.11"]
+
+    services:
+      redis:
+        image: redis:alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
     steps:
-      - uses: actions/checkout@v2
-      - name: Run test suite
-        run: docker-compose run test
+      - uses: actions/checkout@v3
+      - name: Set up PDM
+        uses: pdm-project/setup-pdm@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: true
+      - name: Install dependencies
+        run: pdm install -G :all
+      - name: Run tests
+        run: pdm run pytest
+        env:
+          REDIS_HOST: localhost

@@ -1,3 +1,4 @@
+import os
 from contextlib import redirect_stdout
 from io import StringIO
 
@@ -9,7 +10,7 @@ from just_jobs import BaseSettings
 
 
 class Settings(metaclass=BaseSettings):
-    redis_settings = RedisSettings(host="redis")
+    redis_settings = RedisSettings(host=os.getenv("REDIS_HOST", "redis"))
 
 
 @pytest.fixture(scope="session")

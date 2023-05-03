@@ -19,6 +19,8 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        ports:
+          - 6379:6379
 
     steps:
       - uses: actions/checkout@v3
@@ -31,3 +33,5 @@ jobs:
         run: pdm install -G :all
       - name: Run tests
         run: pdm run pytest
+        env:
+          REDIS_HOST: localhost

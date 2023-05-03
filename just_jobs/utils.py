@@ -1,7 +1,10 @@
+import inspect
 from contextlib import contextmanager
-from typing import Generator
+from typing import Any, Callable, Dict, Generator, Optional, Tuple
 
 from colorama import Style, just_fix_windows_console
+
+from .typing import Context
 
 just_fix_windows_console()
 
@@ -17,3 +20,34 @@ def styled_text(*ansi_codes: str) -> Generator[None, None, None]:
         yield
     finally:
         print(Style.RESET_ALL, end="", flush=True)
+
+
+def convert_kwargs(
+    ctx: Optional[Context],
+    func: Callable[..., Any],
+    args: Tuple[Any, ...],
+    kwargs: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Given the function, convert the ordered arguments into kwargs based on the function
+    signature. If the signature includes a Context parameter, inject it.
+
+    TODO: maybe restrict Context to first or last param to reduce confusion?
+    """
+    iterargs = iter(args)
+
+    injected = False
+    for name, param in inspect.signature(func).parameters.items():
+        if name not in kwargs:
+            if param.annotation == Context:
+                if injected:
+                    raise AttributeError(
+                        "Context should only be defined once in a job's signature."
+                    )
+
+                kwargs[name] = ctx
+                injected = True
+            else:
+                kwargs[name] = next(iterargs)
+
+    return kwargs

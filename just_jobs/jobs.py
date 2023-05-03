@@ -17,7 +17,7 @@ from .typing import (
     Context,
     ReturnType,
 )
-from .utils import styled_text
+from .utils import convert_kwargs, styled_text
 
 
 @dataclass
@@ -55,7 +55,8 @@ class _job(Function, Generic[ReturnType]):
         the job or the result of the job is an asynchronous coroutine, it will
         be also be awaited.
         """
-        result = self.func(None, *args, **kwargs)
+        nkwargs = convert_kwargs(None, self.func, args, kwargs)
+        result = self.func(**nkwargs)
 
         if inspect.iscoroutine(result):
             return await cast(Awaitable[ReturnType], result)
@@ -66,18 +67,17 @@ class _job(Function, Generic[ReturnType]):
         # we shouldn't / cannot pickle the redis instance nor underlying context
         # executors, so remove them from the context
         nctx = {k: ctx[k] for k in ctx if k not in ["redis", "_executors"]}
+        nkwargs = convert_kwargs(nctx, self.func, args, kwargs)
 
         with styled_text(Fore.BLACK, Style.BRIGHT):
             if not self.iscoro:
                 executor = ctx["_executors"][self.job_type]
-                serialized = dill.dumps(partial(self.func, nctx, *args, **kwargs))
+                serialized = dill.dumps(partial(self.func, **nkwargs))
                 return await asyncio.get_running_loop().run_in_executor(
                     executor, _job._dill_executor_func, serialized
                 )
             else:
-                return await cast(
-                    Awaitable[ReturnType], self.func(nctx, *args, **kwargs)
-                )
+                return await cast(Awaitable[ReturnType], self.func(**nkwargs))
 
     @staticmethod
     def _dill_executor_func(serialized: bytes) -> ReturnType:

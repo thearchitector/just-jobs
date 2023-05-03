@@ -9,7 +9,7 @@ from just_jobs.typing import Context
 
 
 @job()
-async def async_task(ctx: Context, val: str):
+async def async_task(val: str, ctx: Context):
     return f"{getpid()}{val}{get_ident()}"
 
 
@@ -19,7 +19,7 @@ def io_task(ctx: Context, val: str):
 
 
 @job(job_type=JobType.CPU_BOUND)
-def cpu_task(ctx: Context, val: str):
+def cpu_task(val: str):
     return f"{current_process().pid}{val}{get_ident()}"
 
 

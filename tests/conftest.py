@@ -3,6 +3,7 @@ from io import StringIO
 
 import pytest
 from arq.connections import RedisSettings
+from arq.worker import create_worker
 
 from just_jobs import BaseSettings
 
@@ -25,3 +26,24 @@ async def pool(settings):
 @pytest.fixture
 def pcapture():
     yield redirect_stdout(StringIO())
+
+
+@pytest.fixture
+def enqueue_run_job(pool, settings, pcapture):
+    async def runner(func, val):
+        job = await pool.enqueue_job(func.__name__, val)
+
+        worker = create_worker(
+            settings_cls=settings,
+            functions=[func],
+            redis_pool=pool,
+            burst=True,
+            poll_delay=0,
+        )
+        with pcapture:
+            await worker.main()
+            await worker.close()
+
+        return await job.result(poll_delay=0)
+
+    return runner

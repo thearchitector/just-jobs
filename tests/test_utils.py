@@ -1,7 +1,7 @@
 import pytest
 from colorama import Fore, Style
 
-from just_jobs.typing import Context
+from just_jobs import Context
 from just_jobs.utils import convert_kwargs, styled_text
 
 

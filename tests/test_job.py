@@ -4,8 +4,7 @@ from threading import get_ident
 
 import pytest
 
-from just_jobs import JobType, job
-from just_jobs.typing import Context
+from just_jobs import Context, JobType, job
 
 
 @job()

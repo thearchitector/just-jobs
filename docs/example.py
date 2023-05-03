@@ -1,19 +1,19 @@
 import asyncio
-from typing import Optional
 
 from arq.connections import RedisSettings
 
-from just_jobs import BaseSettings, Context, JobType, job
+from just_jobs import BaseSettings, JobType, job
+from just_jobs.typing import Context
 
 
 @job()
-async def async_task(ctx: Context, url: str):
+async def async_task(url: str) -> str:
     print("async!", url)
     return url
 
 
-@job(job_type=JobType.IO_BOUND)
-def sync_task(ctx: Optional[Context], url: str):
+@job(job_type=JobType.CPU_BOUND)
+def sync_task(ctx: Context, url: str) -> str:
     # if the context is present, this is being run from the arq listener
     if ctx:
         print("sync!", url)
@@ -25,17 +25,18 @@ class Settings(metaclass=BaseSettings):
     redis_settings = RedisSettings(host="redis")
 
 
-async def main():
+async def main() -> None:
     # create a redis broker using the Settings already defined
-    async with Settings.create_pool() as broker:
+    async with Settings.create_pool() as pool:
         # run the_task right now and return the url
         # even though this is a sync function, `.now` returns an awaitable
         url = await sync_task.now("https://www.google.com")
         print(url)
 
-        await broker.enqueue_job("async_task", "https://gianturl.net")
-        await broker.enqueue_job("sync_task", "https://gianturl.net")
+        await pool.enqueue_job("async_task", "https://gianturl.net")
+        await pool.enqueue_job("sync_task", "https://gianturl.net")
 
 
 if __name__ == "__main__":
+    # run me, then run `arq docs.example.Settings`
     asyncio.run(main())

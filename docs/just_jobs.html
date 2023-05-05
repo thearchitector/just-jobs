@@ -1337,7 +1337,7 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
               <a
                 href="https://fastapi.tiangolo.com/advanced/using-request-directly/"
                 >FastAPI's <code>Request</code></a
-              >. It's no longer a required parameter, but if it exists it will
+              >. It's no longer a required parameter, but if it exists, it will
               get set. It doesn't have to be named <code>ctx</code> either, only
               have the type <code><a href="#Context">Context</a></code
               >.
@@ -1359,7 +1359,7 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
 
           <h2 id="usage">Usage</h2>
 
-          <p>Using just-jobs is pretty straight forward.</p>
+          <p>Using just-jobs is pretty straight forward:</p>
 
           <h3 id="add-job-to-any-function-to-make-it-a-delayable-job">
             Add <code>@job()</code> to any function to make it a delayable job.
@@ -1380,25 +1380,14 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
 
           <p>
             If it's a coroutine function, you don't need to specify a job type
-            (and will get a warning if you do). This might change in the future
-            to support asynchronous CPU-bound tasks.
+            (and will get a warning if you do).
           </p>
 
           <div class="pdoc-code codehilite">
             <pre><span></span><code><span class="nd">@job</span><span class="p">()</span>
-<span class="k">async</span> <span class="k">def</span> <span class="nf">poll_reddit</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">,</span> <span class="n">subr</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">ctx</span><span class="p">:</span>
-        <span class="c1"># enqueued then run by arq</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="c1"># invoked manually</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">poll_reddit</span><span class="p">(</span><span class="n">subr</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span>
 </code></pre>
           </div>
-
-          <p>
-            <code>@job</code> works similarly to <code>arq.func()</code>. If can
-            pass in variables such as <code>keep_result</code> and
-            <code>max_tries</code> to configure the same behavior.
-          </p>
 
           <h3 id="use-now-if-you-want-to-run-the-job-immediately">
             Use <code>.now</code> if you want to run the job immediately.
@@ -1415,8 +1404,19 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
           </p>
 
           <div class="pdoc-code codehilite">
-            <pre><span></span><code><span class="k">await</span> <span class="n">complex_math</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
-<span class="k">await</span> <span class="n">poll_reddit</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="s2">&quot;r/Python&quot;</span><span class="p">)</span>
+            <pre><span></span><code><span class="nd">@job</span><span class="p">()</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">context_aware</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">ctx</span><span class="p">:</span>
+        <span class="c1"># enqueued then run by arq</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;hello </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># invoked manually</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;bye </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span>
+
+<span class="k">await</span> <span class="n">context_aware</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="s2">&quot;world&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;bye world&quot;</span>
+
+<span class="n">j</span> <span class="o">=</span> <span class="k">await</span> <span class="n">p</span><span class="o">.</span><span class="n">enqueue_job</span><span class="p">(</span><span class="s2">&quot;context_aware&quot;</span><span class="p">,</span> <span class="s2">&quot;world&quot;</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">j</span><span class="o">.</span><span class="n">result</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;hello world&quot;</span>
 </code></pre>
           </div>
 
@@ -1447,9 +1447,10 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
             <code>arq.connections.create_pool</code> as you would normally,
             using the <code>create_pool</code> function provided by your
             <code>Settings</code> class ensures the pool it creates always
-            matches your worker's Redis settings. It also lets you take
-            advantage of additional functionality, namely that it can be used as
-            an auto-closing context manager.
+            matches your worker's Redis and serialization settings (it will be
+            less of a headache). It also lets you take advantage of additional
+            functionality, namely that it can be used as an auto-closing context
+            manager.
           </p>
 
           <div class="pdoc-code codehilite">
@@ -1477,29 +1478,64 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
 
           <h2 id="caveats">Caveats</h2>
 
-          <p>
-            <code>arq.func()</code> and <code>@job()</code> are mutually
-            exclusive. If you want to configure a job in the same way, pass the
-            settings you would have passed to <code>func()</code> to
-            <code>@job()</code> instead. Passing an <code>@job()</code> to
-            <code>func()</code> will <strong>not</strong> edit its
-            configuration.
-          </p>
+          <ol>
+            <li>
+              <p>
+                <code>arq.func()</code> and <code>@job()</code> are mutually
+                exclusive. If you want to configure a job in the same way, pass
+                the settings you would have passed to <code>func()</code> to
+                <code>@job()</code> instead.
+              </p>
 
-          <div class="pdoc-code codehilite">
-            <pre><span></span><code><span class="nd">@job</span><span class="p">(</span><span class="n">job_type</span><span class="o">=</span><span class="n"><a href="#JobType.CPU_BOUND">JobType.CPU_BOUND</a></span><span class="p">,</span> <span class="n">keep_result_forever</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_tries</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+              <div class="pdoc-code codehilite">
+                <pre><span></span><code><span class="nd">@job</span><span class="p">(</span><span class="n">job_type</span><span class="o">=</span><span class="n"><a href="#JobType.CPU_BOUND">JobType.CPU_BOUND</a></span><span class="p">,</span> <span class="n">keep_result_forever</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_tries</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 <span class="k">def</span> <span class="nf">task</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+  <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
 </code></pre>
-          </div>
+              </div>
+            </li>
+            <li>
+              <p>
+                There isn't support for asynchronous CPU-bound tasks. Currently,
+                job types only configure the execution behavior of synchronous
+                tasks (not coroutines). However, there are some valid cases for
+                CPU-bound tasks that also need to be run in an asyncio context.
+              </p>
+
+              <p>
+                At the moment, the best way to achieve this will be to create a
+                synchronous CPU-bound task (so it runs in a separate process)
+                that then invokes a coroutine via <code>asyncio.run</code>. If
+                you intend on running the task in the current context from time
+                to time (with <code>.now</code>), just return the coroutine
+                instead and it will get automatically executed in the current
+                event loop.
+              </p>
+
+              <div class="pdoc-code codehilite">
+                <pre><span></span><code><span class="k">async</span> <span class="n">_async_task</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">c</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+   <span class="n">ab</span> <span class="o">=</span> <span class="k">await</span> <span class="n">add</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+   <span class="k">return</span> <span class="k">await</span> <span class="n">add</span><span class="p">(</span><span class="n">ab</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+
+<span class="nd">@job</span><span class="p">(</span><span class="n">job_type</span><span class="o">=</span><span class="n"><a href="#JobType.CPU_BOUND">JobType.CPU_BOUND</a></span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">wrapper_cpu_bound</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">Context</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">c</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+   <span class="n">task</span> <span class="o">=</span> <span class="n">_async_task</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+   <span class="k">return</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">task</span><span class="p">)</span> <span class="k">if</span> <span class="n">ctx</span> <span class="k">else</span> <span class="n">task</span>
+</code></pre>
+              </div>
+            </li>
+          </ol>
 
           <h2 id="example">Example</h2>
 
           <p>
             The complete example is available at
-            <a href="docs/example.py">docs/example.py</a> and should work out of
-            the box. The snippet below is just an excerpt to show the features
-            described above:
+            <a
+              href="https://github.com/thearchitector/just-jobs/blob/main/docs/example.py"
+              >docs/example.py</a
+            >
+            and should work out of the box. The snippet below is just an excerpt
+            to show the features described above:
           </p>
 
           <div class="pdoc-code codehilite">
@@ -1538,7 +1574,7 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
 
           <p>
             This software is licensed under the
-            <a href="LICENSE">BSD 2-Clause “Simplified” License</a>.
+            <a href="LICENSE">3-Clause BSD License</a>.
           </p>
 
           <p>
@@ -1552,9 +1588,6 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
             creating employment for local families and restoring wildlife
             habitats.
           </p>
-
-          <pre><code>
-</code></pre>
         </div>
 
         <input

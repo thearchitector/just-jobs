@@ -31,8 +31,8 @@ def pcapture():
 
 @pytest.fixture
 def enqueue_run_job(pool, settings, pcapture):
-    async def runner(func, val):
-        job = await pool.enqueue_job(func.__name__, val)
+    async def runner(func, *args, **kwargs):
+        job = await pool.enqueue_job(func.__name__, *args, **kwargs)
 
         worker = create_worker(
             settings_cls=settings,
@@ -45,6 +45,6 @@ def enqueue_run_job(pool, settings, pcapture):
             await worker.main()
             await worker.close()
 
-        return await job.result(poll_delay=0)
+        return job
 
     return runner

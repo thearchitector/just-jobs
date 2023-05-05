@@ -5,7 +5,7 @@ version = "2.0.0"
 authors = [
     {name = "Elias Gabriel", email = "me@eliasfgabriel.com"},
 ]
-license = {text = "BSD-2-Clause"}
+license = {text = "BSD-3-Clause"}
 readme = "README.md"
 keywords = ["jobs", "arq", "tasks", "celery", "redis"]
 

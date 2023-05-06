@@ -16,6 +16,8 @@ Some internal concepts are the same though:
 - Sync jobs are run in an executor to prevent event loop blocking.
 - Jobs are runnable if you don't want to delay it.
 
+Changed license to BSD-3-Clause.
+
 ## [1.1.0] - 2022-05-18
 
 ### Changed

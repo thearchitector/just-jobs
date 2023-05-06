@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2023-05-05
+
+I discovered arq, and it does a lot of the same things I was hoping just-jobs would eventually support. Rather than remake the wheel, V2 is a complete rethinking and rewrite using arq as an engine.
+
+Some internal concepts are the same though:
+
+- Redis is the default broking service.
+- You can use both sync and async jobs.
+- Sync jobs are run in an executor to prevent event loop blocking.
+- Jobs are runnable if you don't want to delay it.
+
 ## [1.1.0] - 2022-05-18
 
 ### Changed

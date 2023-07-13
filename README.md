@@ -24,7 +24,7 @@ just-jobs doesn't aim to replace the invocations that arq provides, only wrap so
 - Define and run non-async jobs. Passing a non-async `@job` function to arq will run properly. Non-async jobs can also be defined as either IO-bound or CPU-bound, which changes how the job will be executed to prevent blocking the asyncio event loop.
 - The arq `Context` parameter now works a lot like [FastAPI's `Request`](https://fastapi.tiangolo.com/advanced/using-request-directly/). It's no longer a required parameter, but if it exists, it will get set. It doesn't have to be named `ctx` either, only have the type `Context`.
 - Specify a single `RedisSettings` within your `WorkerSettings` from which you can create a pool using `Settings.create_pool()`.
-- Run jobs either immediately with the `.now()` function or via normal arq enqueueing.
+- Run jobs either immediately or via normal arq enqueueing.
 - Use non-pickable job arguments and kwargs (supported by the [dill](http://dill.rtfd.io/) library).
 
 ## Usage
@@ -47,9 +47,9 @@ If it's a coroutine function, you don't need to specify a job type (and will get
 async def poll_reddit(subr: str)
 ```
 
-### Use `.now` if you want to run the job immediately.
+### Invoke a job normally if you want to run it immediately.
 
-Using `.now` allows you to run the job as if it were a normal function. If you have logic that you only want to execute when enqueued, include a parameter with type `Context` and check if it exists at runtime (functions with a `Context` that are run immediately will have that argument set to `None`).
+Invoking a job as a regular function allows you to run a job as if it were one. If you have logic that you only want to execute when enqueued, include a parameter with type `Context` and check if it exists at runtime (functions with a `Context` that are run immediately will have that argument set to `None`).
 
 ```python
 @job()
@@ -61,7 +61,7 @@ async def context_aware(ctx: Context, msg: str):
         # invoked manually
         return f"bye {msg}"
 
-await context_aware.now("world") == "bye world"
+await context_aware("world") == "bye world"
 
 j = await p.enqueue_job("context_aware", "world")
 await j.result() == "hello world"
@@ -110,7 +110,7 @@ await pool.enqueue_job('complex_math', 2, 1, 3)
 
 2. There isn't support for asynchronous CPU-bound tasks. Currently, job types only configure the execution behavior of synchronous tasks (not coroutines). However, there are some valid cases for CPU-bound tasks that also need to be run in an asyncio context.
 
-   At the moment, the best way to achieve this will be to create a synchronous CPU-bound task (so it runs in a separate process) that then invokes a coroutine via `asyncio.run`. If you intend on running the task in the current context from time to time (with `.now`), just return the coroutine instead and it will get automatically executed in the current event loop.
+   At the moment, the best way to achieve this will be to create a synchronous CPU-bound task (so it runs in a separate process) that then invokes a coroutine via `asyncio.run`. If you intend on running the task in the current context from time to time, just return the coroutine instead and it will get automatically executed in the current event loop.
 
    ```python
    async _async_task(a: int, b: int, c: int):
@@ -149,8 +149,7 @@ async def main():
     # create a Redis pool using the Settings already defined
     pool = await Settings.create_pool()
     # run the_task right now and return the url
-    # even though this is a sync function, `.now` returns an awaitable
-    url = await sync_task.now("https://www.theglassfiles.com")
+    url = sync_task("https://www.theglassfiles.com")
 
     await pool.enqueue_job("async_task", "https://www.eliasfgabriel.com")
     await pool.enqueue_job("sync_task", "https://gianturl.net")

@@ -29,8 +29,7 @@ async def main() -> None:
     # create a redis broker using the Settings already defined
     async with Settings.create_pool() as pool:
         # run the_task right now and return the url
-        # even though this is a sync function, `.now` returns an awaitable
-        url = await sync_task.now("https://www.google.com")
+        url = sync_task("https://www.google.com")
         print(url)
 
         await pool.enqueue_job("async_task", "https://gianturl.net")

@@ -1,7 +1,7 @@
 [project]
 name = "just-jobs"
 description = "A friendly and lightweight wrapper for arq."
-version = "2.0.0"
+version = "2.1.0"
 authors = [
     {name = "Elias Gabriel", email = "me@eliasfgabriel.com"},
 ]
@@ -17,11 +17,10 @@ dependencies = [
 ]
 
 [project.urls]
-repository = "https://github.com/thearchitector/just-jobs"
+homepage = "https://justjobs.thearchitector.dev"
 documentation = "https://justjobs.thearchitector.dev"
-
-[tool.pdm.build]
-includes = ["just_jobs/py.typed", "CHANGELOG.md"]
+changelog = "https://github.com/thearchitector/just-jobs/blob/main/CHANGELOG.md"
+repository = "https://github.com/thearchitector/just-jobs"
 
 [tool.pdm.scripts]
 docs = "pdoc -o docs --no-search just_jobs"

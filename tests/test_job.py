@@ -39,13 +39,26 @@ def async_cpu_task(ctx: Context, val: str):
 
 @pytest.mark.parametrize("func", [async_task, cpu_task, io_task, async_cpu_task])
 async def test_invoke_now(func):
-    res = await func.now(" on ")
+    with pytest.deprecated_call():
+        res = await func.now(" on ")
+        assert res == f"{getpid()} on {get_ident()}"
+
+
+@pytest.mark.parametrize("func", [async_task, async_cpu_task])
+async def test_invoke_async_now(func):
+    res = await func(" on ")
+    assert res == f"{getpid()} on {get_ident()}"
+
+
+@pytest.mark.parametrize("func", [cpu_task, io_task])
+async def test_invoke_sync_now(func):
+    res = func(" on ")
     assert res == f"{getpid()} on {get_ident()}"
 
 
 async def test_failing_now():
     with pytest.raises(Exception, match="mock"):
-        await failing_task.now()
+        await failing_task()
 
 
 async def test_enqueue_job_async(enqueue_run_job):

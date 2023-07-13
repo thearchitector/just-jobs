@@ -3,7 +3,7 @@ import inspect
 import warnings
 from dataclasses import dataclass, field
 from functools import partial, update_wrapper
-from typing import Any, Awaitable, Callable, Generic, Optional, cast
+from typing import Any, Awaitable, Callable, Generic, Optional, Union, cast
 
 import dill  # type: ignore
 from arq.typing import SecondsTimedelta, WorkerCoroutine
@@ -50,18 +50,29 @@ class _job(Function, Generic[ReturnType]):
         update_wrapper(self, self.func)
 
     async def now(self, *args: Any, **kwargs: Any) -> ReturnType:
+        warnings.warn(
+            ".now() is deprecated, as the preferred way of immediately invoking a job"
+            " is just as you would a normal function, ie. func().",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        result = self(*args, **kwargs)
+
+        if inspect.iscoroutine(result):
+            return await cast(Awaitable[ReturnType], result)
+
+        return cast(ReturnType, result)
+
+    def __call__(
+        self, *args: Any, **kwargs: Any
+    ) -> Union[ReturnType, Awaitable[ReturnType]]:
         """
         Runs the job immediately with a `context` argument set to None. If either
         the job or the result of the job is an asynchronous coroutine, it will
         be also be awaited.
         """
         nkwargs = convert_kwargs(None, self.func, args, kwargs)
-        result = self.func(**nkwargs)
-
-        if inspect.iscoroutine(result):
-            return await cast(Awaitable[ReturnType], result)
-
-        return cast(ReturnType, result)
+        return self.func(**nkwargs)
 
     async def run(self, ctx: Context, *args: Any, **kwargs: Any) -> ReturnType:
         # we shouldn't / cannot pickle the redis instance nor underlying context

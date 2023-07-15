@@ -112,14 +112,15 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
 
 <h2 id="features">Features</h2>
 
-<p>just-jobs doesn't aim to replace the invocations that arq provides, only wrap some of them to make job creation and execution easier and better. It lets you:</p>
+<p>just-jobs doesn't aim to replace the invocations that arq provides, only wrap some of them to make job creation and execution better and easier. It lets you:</p>
 
 <ul>
 <li>Define and run non-async jobs. Passing a non-async <code>@job</code> function to arq will run properly. Non-async jobs can also be defined as either IO-bound or CPU-bound, which changes how the job will be executed to prevent blocking the asyncio event loop.</li>
 <li>The arq <code><a href="#Context">Context</a></code> parameter now works a lot like <a href="https://fastapi.tiangolo.com/advanced/using-request-directly/">FastAPI's <code>Request</code></a>. It's no longer a required parameter, but if it exists, it will get set. It doesn't have to be named <code>ctx</code> either, only have the type <code><a href="#Context">Context</a></code>.</li>
 <li>Specify a single <code>RedisSettings</code> within your <code>WorkerSettings</code> from which you can create a pool using <code>Settings.create_pool()</code>.</li>
 <li>Run jobs either immediately or via normal arq enqueueing.</li>
-<li>Use non-pickable job arguments and kwargs (supported by the <a href="http://dill.rtfd.io/">dill</a> library).</li>
+<li>Use non-picklable job arguments and kwargs (supported by the <a href="http://dill.rtfd.io/">dill</a> library).</li>
+<li>Signed secure job serialization using <code>blake2b</code>.</li>
 </ul>
 
 <h2 id="usage">Usage</h2>
@@ -131,7 +132,7 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
 <p>If the job is synchronous, specify its job type so just-jobs knows how to optimally run it. If you don't, you'll get an error. This helps encourage thoughtful and intentional job design while ensuring that the event loop is never blocked.</p>
 
 <div class="pdoc-code codehilite">
-<pre><span></span><code><span class="nd">@job</span><span class="p">(</span><span class="n">job_type</span><span class="o">=</span><span class="n"><a href="#JobType.CPU_BOUND">JobType.CPU_BOUND</a></span><span class="p">)</span>
+<pre><span></span><code><span class="nd">@job</span><span class="p">(</span><span class="n">job_type</span><span class="o">=</span><span class="n"><a href="#JobType.CPU_BOUND">JobType.CPU_BOUND</a></span><span class="p">)</span> <span class="c1"># or <a href="#JobType.IO_BOUND">JobType.IO_BOUND</a></span>
 <span class="k">def</span> <span class="nf">complex_math</span><span class="p">(</span><span class="n">i</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">j</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span>
 </code></pre>
 </div>
@@ -143,6 +144,10 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
 <span class="k">async</span> <span class="k">def</span> <span class="nf">poll_reddit</span><span class="p">(</span><span class="n">subr</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span>
 </code></pre>
 </div>
+
+<p>By default, just-jobs will utilize your Python version's default number of <a href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor">thread</a> and <a href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ProcessPoolExecutor">process</a> workers to handle IO-bound and CPU-bound tasks respectively. On 3.8+, that is <code>min(32, CPU_COUNT + 4)</code> for IO-bound jobs and <code>1 &lt;= CPU_COUNT &lt;= 61</code> for CPU-bound ones.</p>
+
+<p>If you want to configure those max worker values, you can do so via the <code>MAX_THREAD_WORKERS</code> and <code>MAX_PROCESS_WORKERS</code> environment variables.</p>
 
 <h3 id="invoke-a-job-normally-if-you-want-to-run-it-immediately">Invoke a job normally if you want to run it immediately.</h3>
 
@@ -190,9 +195,13 @@ $<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </sp
 </code></pre>
 </div>
 
+<h3 id="sign-your-job-serializations-with-blake2b">Sign your job serializations with <code>blake2b</code>.</h3>
+
+<p>By default, using just-jobs <code>Settings</code> means all serialized jobs are prefixed with a signature which is then parsed and validated before job execution. This helps ensure that any jobs you serialize do not get tampered with while enqueued and waiting for execution. The default (and very insecure) secret used for signing is <code>thisisasecret</code>. In any production or public-facing deployment, you _should_ change this value to something private and secure. It can be changed via the <code>JOB_SERIALIZATION_SECRET</code> environment variable.</p>
+
 <h3 id="enqueue-your-job">Enqueue your job.</h3>
 
-<p>just-jobs doesn't change the way in which you enqueue your jobs. Just use <code>await pool.enqueue_job(...)</code>.</p>
+<p>just-jobs doesn't change the way in which you enqueue your jobs. Just use <code>await pool.enqueue_job(...)</code>. Using just-jobs, you also don't have to worry as much about the type of arguments you supply; all Python objects supported by the <a href="http://dill.rtfd.io/">dill</a> serialization library will work just fine.</p>
 
 <div class="pdoc-code codehilite">
 <pre><span></span><code><span class="k">await</span> <span class="n">pool</span><span class="o">.</span><span class="n">enqueue_job</span><span class="p">(</span><span class="s1">&#39;complex_math&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>

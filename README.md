@@ -19,13 +19,14 @@ $ pip install --user just-jobs
 
 ## Features
 
-just-jobs doesn't aim to replace the invocations that arq provides, only wrap some of them to make job creation and execution easier and better. It lets you:
+just-jobs doesn't aim to replace the invocations that arq provides, only wrap some of them to make job creation and execution better and easier. It lets you:
 
 - Define and run non-async jobs. Passing a non-async `@job` function to arq will run properly. Non-async jobs can also be defined as either IO-bound or CPU-bound, which changes how the job will be executed to prevent blocking the asyncio event loop.
 - The arq `Context` parameter now works a lot like [FastAPI's `Request`](https://fastapi.tiangolo.com/advanced/using-request-directly/). It's no longer a required parameter, but if it exists, it will get set. It doesn't have to be named `ctx` either, only have the type `Context`.
 - Specify a single `RedisSettings` within your `WorkerSettings` from which you can create a pool using `Settings.create_pool()`.
 - Run jobs either immediately or via normal arq enqueueing.
-- Use non-pickable job arguments and kwargs (supported by the [dill](http://dill.rtfd.io/) library).
+- Use non-picklable job arguments and kwargs (supported by the [dill](http://dill.rtfd.io/) library).
+- Signed secure job serialization using `blake2b`.
 
 ## Usage
 
@@ -36,7 +37,7 @@ Using just-jobs is pretty straight forward:
 If the job is synchronous, specify its job type so just-jobs knows how to optimally run it. If you don't, you'll get an error. This helps encourage thoughtful and intentional job design while ensuring that the event loop is never blocked.
 
 ```python
-@job(job_type=JobType.CPU_BOUND)
+@job(job_type=JobType.CPU_BOUND) # or JobType.IO_BOUND
 def complex_math(i: int, j: int, k: int)
 ```
 
@@ -46,6 +47,10 @@ If it's a coroutine function, you don't need to specify a job type (and will get
 @job()
 async def poll_reddit(subr: str)
 ```
+
+By default, just-jobs will utilize your Python version's default number of [thread](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor) and [process](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ProcessPoolExecutor) workers to handle IO-bound and CPU-bound tasks respectively. On 3.8+, that is `min(32, CPU_COUNT + 4)` for IO-bound jobs and `1 <= CPU_COUNT <= 61` for CPU-bound ones.
+
+If you want to configure those max worker values, you can do so via the `MAX_THREAD_WORKERS` and `MAX_PROCESS_WORKERS` environment variables.
 
 ### Invoke a job normally if you want to run it immediately.
 
@@ -90,9 +95,13 @@ async with Settings.create_pool() as pool:
     ...
 ```
 
+### Sign your job serializations with `blake2b`.
+
+By default, using just-jobs `Settings` means all serialized jobs are prefixed with a signature which is then parsed and validated before job execution. This helps ensure that any jobs you serialize do not get tampered with while enqueued and waiting for execution. The default (and very insecure) secret used for signing is `thisisasecret`. In any production or public-facing deployment, you _should_ change this value to something private and secure. It can be changed via the `JOB_SERIALIZATION_SECRET` environment variable.
+
 ### Enqueue your job.
 
-just-jobs doesn't change the way in which you enqueue your jobs. Just use `await pool.enqueue_job(...)`.
+just-jobs doesn't change the way in which you enqueue your jobs. Just use `await pool.enqueue_job(...)`. Using just-jobs, you also don't have to worry as much about the type of arguments you supply; all Python objects supported by the [dill](http://dill.rtfd.io/) serialization library will work just fine.
 
 ```python
 await pool.enqueue_job('complex_math', 2, 1, 3)
